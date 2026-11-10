@@ -1,0 +1,35 @@
+[
+    {
+        "name": "Yard Security - Arm",
+        "description": "Arm Yard Security now, whatever the arming mode says, until Disarm or Automatic.",
+        "script": "arm.sh",
+        "args": []
+    },
+    {
+        "name": "Yard Security - Disarm",
+        "description": "Disarm Yard Security now and turn off any area it has lit, until Arm or Automatic.",
+        "script": "disarm.sh",
+        "args": []
+    },
+    {
+        "name": "Yard Security - Automatic",
+        "description": "Go back to the arming mode set on the Yard Security page.",
+        "script": "auto.sh",
+        "args": []
+    },
+    {
+        "name": "Yard Security - Test Area",
+        "description": "Run an area's enter action, then its exit action after the area's hold time.",
+        "script": "test.sh",
+        "args": [
+            {
+                "name": "area",
+                "description": "Area",
+                "type": "datalist",
+                "contentListUrl": "api/plugin/fpp-plugin-YardSecurity/areanames",
+                "allowBlanks": false,
+                "optional": false
+            }
+        ]
+    }
+]

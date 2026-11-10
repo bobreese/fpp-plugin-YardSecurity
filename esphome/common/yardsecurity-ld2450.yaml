@@ -1,0 +1,119 @@
+# Shared config for a Yard Security sensor: ESP32 DevKit (ESP32-WROOM-32 / 32U)
+# wired to an HLK-LD2450 radar. Each sensor's own file sets device_name.
+#
+# Wiring:  LD2450 5V -> ESP32 5V (VIN)    LD2450 GND -> GND
+#          LD2450 TX -> GPIO16 (RX2)      LD2450 RX  -> GPIO17 (TX2)
+#
+# What it sends: about 4 times a second, on <prefix>/<device_name>/targets,
+#   {"c":1,"t":[[x,y],null,null]}
+# x = mm left(-)/right(+), y = mm out from the sensor, null = no person in that slot,
+# c = 1 while the radar is answering. Plus <prefix>/<device_name>/status online/offline.
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # If Wi-Fi is not reachable, the ESP32 opens its own hotspot so you can fix it.
+  ap:
+    ssid: "${device_name}-setup"
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Web page at http://<device_name>.local for checking the radar and turning
+# off its Bluetooth.
+web_server:
+  port: 80
+
+mqtt:
+  broker: !secret mqtt_broker
+  port: 1883
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  discovery: false
+  topic_prefix: ${topic_prefix}/${device_name}
+
+uart:
+  id: radar_uart
+  rx_pin: GPIO16
+  tx_pin: GPIO17
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+globals:
+  - id: last_frame_ms
+    type: uint32_t
+    initial_value: "0"
+
+ld2450:
+  id: radar
+  uart_id: radar_uart
+  # Remember when the radar last sent a frame, so the plugin can tell a
+  # silent radar (loose wire) from an empty yard.
+  on_data:
+    - lambda: "id(last_frame_ms) = millis();"
+
+sensor:
+  - platform: ld2450
+    ld2450_id: radar
+    target_1:
+      x: { id: t1_x, internal: true }
+      y: { id: t1_y, internal: true }
+    target_2:
+      x: { id: t2_x, internal: true }
+      y: { id: t2_y, internal: true }
+    target_3:
+      x: { id: t3_x, internal: true }
+      y: { id: t3_y, internal: true }
+
+switch:
+  - platform: ld2450
+    ld2450_id: radar
+    bluetooth:
+      name: "Radar Bluetooth"
+
+interval:
+  - interval: 250ms
+    then:
+      - if:
+          condition:
+            mqtt.connected:
+          then:
+            - mqtt.publish:
+                topic: ${topic_prefix}/${device_name}/targets
+                retain: false
+                payload: !lambda |-
+                  sensor::Sensor *xs[3] = {id(t1_x), id(t2_x), id(t3_x)};
+                  sensor::Sensor *ys[3] = {id(t1_y), id(t2_y), id(t3_y)};
+                  std::string p = "{\"c\":";
+                  bool radar_ok = id(last_frame_ms) != 0 && (millis() - id(last_frame_ms)) < 2000;
+                  p += radar_ok ? "1" : "0";
+                  p += ",\"t\":[";
+                  for (int i = 0; i < 3; i++) {
+                    if (i > 0) p += ",";
+                    float x = xs[i]->state;
+                    float y = ys[i]->state;
+                    if (std::isnan(x) || std::isnan(y)) {
+                      p += "null";
+                    } else {
+                      p += "[" + std::to_string((int) x) + "," + std::to_string((int) y) + "]";
+                    }
+                  }
+                  p += "]}";
+                  return p;

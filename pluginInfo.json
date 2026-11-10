@@ -1,0 +1,63 @@
+{
+	"repoName": "fpp-plugin-YardSecurity",
+	"name": "Yard Security",
+	"author": "bobreese",
+	"description": "Turns on show lights when someone walks into an area of your yard. ESP32 + HLK-LD2450 radar sensors report over MQTT (an optional built-in broker on this device, or your own); the plugin sends FPP commands to the show player you choose, after the show, on a schedule, or always.",
+	"homeURL": "https://github.com/bobreese/fpp-plugin-YardSecurity",
+	"srcURL": "https://github.com/bobreese/fpp-plugin-YardSecurity.git",
+	"bugURL": "https://github.com/bobreese/fpp-plugin-YardSecurity/issues",
+	"allowUpdates": 1,
+	"releaseNotesStyle": "gitHistory",
+	"privacy": {
+		"summary": "Watches your yard with radar sensors you install and lights areas on your show player when someone walks in. Readings are not stored and nothing leaves your network.",
+		"sends": [
+			{
+				"to": "http://the show player you set",
+				"what": "light on/off commands and show status checks",
+				"why": "to light an area and to know when the show is over",
+				"alwaysOn": false
+			}
+		],
+		"collects": [],
+		"sensors": [
+			{
+				"type": "presence",
+				"stored": false
+			}
+		],
+		"remoteAccess": "lan",
+		"systemChanges": [
+			{
+				"kind": "service",
+				"what": "Only if you turn on the built-in broker: enables FPP's preinstalled Mosquitto with a config file and password file under /etc/mosquitto"
+			},
+			{
+				"kind": "network",
+				"what": "Only if you turn on the built-in broker: Mosquitto listens on port 1883 on your network, password required, for the ESP32 sensors"
+			}
+		],
+		"closedCode": false,
+		"other": "The plugin's API on FPP's web server (no password by default) can arm, disarm and test areas, which sends light commands to your show player. With debug logging on, the plugin log records when each area is entered."
+	},
+	"versions": [
+		{
+			"minFPPVersion": "10.0",
+			"maxFPPVersion": "0",
+			"branch": "main",
+			"sha": "",
+			"platforms": [
+				"Raspberry Pi",
+				"BeagleBone Black",
+				"BeagleBone 64",
+				"Armbian",
+				"Debian",
+				"Ubuntu"
+			]
+		}
+	],
+	"dependencies": {
+		"packages": [
+			"python3-paho-mqtt"
+		]
+	}
+}

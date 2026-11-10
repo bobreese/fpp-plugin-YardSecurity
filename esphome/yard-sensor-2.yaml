@@ -1,0 +1,8 @@
+# Yard Security sensor 2. Flash with:  esphome run yard-sensor-2.yaml
+substitutions:
+  device_name: yard-sensor-2
+  friendly_name: Yard Sensor 2
+  topic_prefix: yardsecurity   # must match "Topic prefix" on the plugin page
+
+packages:
+  yardsecurity: !include common/yardsecurity-ld2450.yaml

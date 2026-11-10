@@ -1,0 +1,15 @@
+/* Yard Security: only what Bootstrap does not cover. Colours come from theme variables. */
+.ys-app .ys-name { max-width: 20rem; flex: 1 1 12rem; }
+.ys-app .ys-port { max-width: 7rem; }
+.ys-app .ys-radar { width: 100%; max-width: 100%; height: auto; display: block; }
+.ys-app .ys-fan { fill: var(--bs-tertiary-bg); stroke: var(--bs-border-color); stroke-width: 0.08; }
+.ys-app .ys-ring { fill: none; stroke: var(--bs-border-color); stroke-width: 0.06; stroke-dasharray: 0.3 0.3; }
+.ys-app .ys-ring-label { fill: var(--bs-secondary-color); font-size: 0.9px; }
+.ys-app .ys-zone { stroke-width: 0.1; fill-opacity: 0.25; }
+.ys-app .ys-zone-0 { fill: var(--bs-primary); stroke: var(--bs-primary); }
+.ys-app .ys-zone-1 { fill: var(--bs-success); stroke: var(--bs-success); }
+.ys-app .ys-zone-2 { fill: var(--bs-warning); stroke: var(--bs-warning); }
+.ys-app .ys-zone-3 { fill: var(--bs-info); stroke: var(--bs-info); }
+.ys-app .ys-target { fill: var(--bs-danger); stroke: var(--bs-body-bg); stroke-width: 0.15; }
+.ys-app .ys-sensor-dot { fill: var(--bs-body-color); }
+.ys-app .ys-savebar { position: sticky; bottom: 0; background: var(--bs-body-bg); padding: 0.5rem 0; z-index: 2; }
