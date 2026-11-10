@@ -184,3 +184,16 @@
         </div>
     </div>
 </div>
+<?php
+// Loaded here rather than from js/ and css/ (which FPP auto-loads with no
+// version in the URL): the ?v= changes with each update, so a browser can
+// never keep running an old copy of the page script against a new page.
+foreach (array('yardsecurity.css') as $f) {
+    printf("<link rel='stylesheet' href='plugin.php?plugin=fpp-plugin-YardSecurity&amp;file=assets/%s&amp;nopage=1&amp;v=%d'>\n",
+        $f, @filemtime(__DIR__ . '/assets/' . $f));
+}
+foreach (array('yardsecurity.js', 'yardsecurity-tour.js') as $f) {
+    printf("<script src='plugin.php?plugin=fpp-plugin-YardSecurity&amp;file=assets/%s&amp;nopage=1&amp;v=%d'></script>\n",
+        $f, @filemtime(__DIR__ . '/assets/' . $f));
+}
+?>

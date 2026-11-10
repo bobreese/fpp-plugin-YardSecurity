@@ -5,7 +5,7 @@
  * help page. It does not block the page: each step points at the part of the
  * page to use, and a live check shows when the step is done.
  *
- * Talks to js/yardsecurity.js through window.YardSecurity and the ys:ready
+ * Talks to assets/yardsecurity.js through window.YardSecurity and the ys:ready
  * event (FPP loads plugin scripts in no fixed order).
  */
 (function () {
@@ -17,7 +17,9 @@
     var target = null;
 
     function $(id) { return document.getElementById(id); }
-    function Y() { return window.YardSecurity; }
+    // The page script's state, or null until it has loaded. Every step must
+    // still work (minus its live check) without it.
+    function Y() { var y = window.YardSecurity; return y && y.ready ? y : null; }
 
     function esc(s) {
         return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -42,6 +44,8 @@
 
     function saved() { return !(Y() && Y().isDirty()); }
 
+    var NOT_LOADED = 'Live check unavailable: the page did not finish loading. Reload it (Ctrl+F5 / Cmd+Shift+R).';
+
     // Each check returns [state, text]; state is "ok", "wait" or "warn".
     var STEPS = [
         {
@@ -63,7 +67,7 @@
                     '<li><b>Driveway Off</b>: <i>Overlay Model State</i>, your model, <i>Disabled</i></li></ul>' +
                     '<p class="mb-0">Then come back here and type the show player\'s address in <b>Address</b> (highlighted). If the show player has a UI password, enter it too.</p>';
             },
-            actions: [{ label: 'Check the show player', run: function () { Y().reloadPresets(); } }],
+            actions: [{ label: 'Check the show player', run: function () { if (Y()) { Y().reloadPresets(); } } }],
             check: function () {
                 var p = Y().presets();
                 if (!p.loaded) { return ['wait', 'Checking the show player...']; }
@@ -88,7 +92,7 @@
         {
             title: 'Step 3: Turn on the built-in broker',
             target: function () { return closest('.ys-builtin') || closest('#ys-mqtt-mode', '.row'); },
-            onShow: function () { Y().refreshBroker(); },
+            onShow: function () { if (Y()) { Y().refreshBroker(); } },
             body: function () {
                 if (cfg().mqtt && cfg().mqtt.mode === 'external') {
                     return '<p class="mb-0">You chose <b>A broker I already run</b>, so there is nothing to turn on. Make sure that broker has the user and password from step 2, then press <b>Next</b>.</p>';
@@ -204,6 +208,14 @@
         }
     ];
 
+    function safeBody(step) {
+        try {
+            return step.body();
+        } catch (e) {
+            return '<p class="text-danger-emphasis">This step could not be shown (' + esc(e.message) + ').</p>';
+        }
+    }
+
     function clearTarget() {
         if (target) { target.classList.remove('ys-tour-target'); }
         target = null;
@@ -213,8 +225,13 @@
         var step = STEPS[stepIndex];
         var box = panel && panel.querySelector('.ys-tour-check');
         if (!box) { return; }
-        if (!step.check || !Y()) { box.classList.add('d-none'); return; }
-        var r = step.check();
+        if (!step.check) { box.classList.add('d-none'); return; }
+        var r;
+        try {
+            r = Y() ? step.check() : ['warn', NOT_LOADED];
+        } catch (e) {
+            r = ['warn', 'Live check failed: ' + e.message];
+        }
         var icon = r[0] === 'ok' ? '&#10003;' : (r[0] === 'warn' ? '!' : '&hellip;');
         var cls = r[0] === 'ok' ? 'text-success-emphasis bg-success-subtle border-success-subtle' :
             (r[0] === 'warn' ? 'text-warning-emphasis bg-warning-subtle border-warning-subtle' : 'text-body-secondary bg-body-tertiary');
@@ -243,7 +260,7 @@
             '  <h2 class="h6 mb-0 me-auto" id="ys-tour-title">' + esc(step.title) + '</h2>' +
             '  <span class="small text-body-secondary text-nowrap">' + (stepIndex + 1) + ' / ' + STEPS.length + '</span>' +
             '</div>' +
-            '<div class="ys-tour-text small">' + step.body() + '</div>' +
+            '<div class="ys-tour-text small">' + safeBody(step) + '</div>' +
             (acts ? '<div class="d-flex flex-wrap gap-2 mt-2">' + acts + '</div>' : '') +
             '<div class="ys-tour-check d-none" role="status" aria-live="polite"></div>';
         panel.querySelector('[data-tour="back"]').disabled = stepIndex === 0;
@@ -320,16 +337,20 @@
         $('ys-app').appendChild(panel);
     }
 
-    function start() {
-        var btn = $('ys-tour-start');
-        if (btn) { btn.addEventListener('click', function () { open(0); }); }
-        var wanted = /[?&]tour=1(&|$)/.test(window.location.search);
-        if (wanted || (Y() && !Y().info().walkthroughDone)) { open(0); }
+    // Opens by itself on the first visit, once the page script says the
+    // walkthrough has not been finished yet.
+    function autoStart() {
+        if (Y() && !Y().info().walkthroughDone && (!panel || panel.classList.contains('d-none'))) { open(0); }
     }
 
     function init() {
         if (!$('ys-app')) { return; }  // another page of this plugin
-        if (Y() && Y().ready) { start(); } else { document.addEventListener('ys:ready', start, { once: true }); }
+        // The button and ?tour=1 never wait for the page script: if it is
+        // slow, stale or broken, the walkthrough still opens and says so.
+        var btn = $('ys-tour-start');
+        if (btn) { btn.addEventListener('click', function () { open(0); }); }
+        if (/[?&]tour=1(&|$)/.test(window.location.search)) { open(0); }
+        if (Y()) { autoStart(); } else { document.addEventListener('ys:ready', autoStart, { once: true }); }
     }
 
     if (document.readyState === 'loading') {

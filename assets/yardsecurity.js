@@ -1,4 +1,4 @@
-/* Yard Security plugin page. FPP loads every file in js/ on this plugin's pages. */
+/* Yard Security plugin page. Loaded by status.php with a version in the URL. */
 (function () {
     'use strict';
 
@@ -547,7 +547,7 @@
             if (dirty) { e.preventDefault(); e.returnValue = ''; }
         });
 
-        // State the walkthrough (js/yardsecurity-tour.js) reads for its live checks.
+        // State the walkthrough (assets/yardsecurity-tour.js) reads for its live checks.
         window.YardSecurity = {
             status: function () { return lastStatus; },
             config: function () { return cfg; },
