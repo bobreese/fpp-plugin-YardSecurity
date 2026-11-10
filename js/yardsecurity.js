@@ -20,6 +20,9 @@
     };
 
     var cfg = null;
+    var presetInfo = { loaded: false, ok: false, count: 0, error: '' };
+    var brokerInfo = { loaded: false, configured: false, active: false };
+    var configInfo = { hasMqttPassword: false, hasShowPassword: false, walkthroughDone: true };
     var lastStatus = null;
     var dirty = false;
 
@@ -291,6 +294,9 @@
                 m.onExit = a && a.onExit && typeof a.onExit === 'object' ? a.onExit : { type: 'none' };
                 return m;
             });
+            configInfo.hasMqttPassword = !!r.hasMqttPassword;
+            configInfo.hasShowPassword = !!r.hasShowPassword;
+            configInfo.walkthroughDone = !!r.walkthroughDone;
             $('ys-show-password').placeholder = r.hasShowPassword ? '(saved)' : '';
             $('ys-mqtt-password').placeholder = r.hasMqttPassword ? '(saved)' : 'not set';
             if (render !== false) {
@@ -307,6 +313,7 @@
         api('presets' + q).then(function (r) {
             var list = $('ys-preset-list');
             list.innerHTML = '';
+            presetInfo = { loaded: true, ok: !!r.ok, count: r.ok ? r.presets.length : 0, error: r.ok ? '' : r.error };
             if (!r.ok) {
                 $('ys-presets-note').className = 'small mb-2 text-warning-emphasis';
                 $('ys-presets-note').textContent = r.error + ' You can still type preset names.';
@@ -320,12 +327,14 @@
             $('ys-presets-note').className = 'small mb-2 text-body-secondary';
             $('ys-presets-note').textContent = r.presets.length ? r.presets.length + ' presets found on the show player.' : 'The show player has no Command Presets yet.';
         }).catch(function () {
+            presetInfo = { loaded: true, ok: false, count: 0, error: 'Could not load presets.' };
             $('ys-presets-note').textContent = 'Could not load presets.';
         });
     }
 
     function refreshBroker() {
         api('broker').then(function (r) {
+            brokerInfo = { loaded: true, configured: !!r.configured, active: !!r.active };
             var s = !r.ok ? 'unknown' : (r.configured ? (r.active ? 'on' : 'configured, but Mosquitto is not running') : 'off');
             $('ys-broker-state').textContent = s;
         }).catch(function () { $('ys-broker-state').textContent = 'unknown'; });
@@ -538,11 +547,29 @@
             if (dirty) { e.preventDefault(); e.returnValue = ''; }
         });
 
+        // State the walkthrough (js/yardsecurity-tour.js) reads for its live checks.
+        window.YardSecurity = {
+            status: function () { return lastStatus; },
+            config: function () { return cfg; },
+            presets: function () { return presetInfo; },
+            broker: function () { return brokerInfo; },
+            info: function () { return configInfo; },
+            isDirty: function () { return dirty; },
+            reloadPresets: loadPresets,
+            refreshBroker: refreshBroker,
+            markWalkthrough: function (done) {
+                configInfo.walkthroughDone = !!done;
+                return api('walkthrough', 'POST', { done: !!done });
+            }
+        };
+
         loadConfig().then(function () {
             loadPresets();
             refreshBroker();
             poll();
             window.setInterval(poll, 1000);
+            window.YardSecurity.ready = true;
+            document.dispatchEvent(new CustomEvent('ys:ready'));
         });
     }
 

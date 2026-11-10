@@ -9,6 +9,7 @@
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
             <h2 class="h5 mb-0 me-auto">Yard Security</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="ys-tour-start">Walkthrough</button>
             <span id="ys-armed-badge" class="badge text-bg-secondary fs-6">...</span>
         </div>
         <div class="card-body">

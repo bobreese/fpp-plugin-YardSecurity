@@ -7,6 +7,12 @@
             area's trigger distance, this FPP tells your show player to run a command, usually a Command Preset such as
             "Driveway On", and runs the exit command once the area has been clear for the hold time.</p>
 
+            <p>
+                <a class="btn btn-primary" href="plugin.php?plugin=fpp-plugin-YardSecurity&amp;page=status.php&amp;tour=1">Start the setup walkthrough</a>
+            </p>
+            <p class="small text-body-secondary">The walkthrough opens by itself the first time you visit the Yard Security page.
+            You can replay it any time with the <b>Walkthrough</b> button at the top of that page.</p>
+
             <h3 class="h6">Setup, in order</h3>
             <ol>
                 <li>On the <b>show player</b>, make a Command Preset for each area turning on and one turning off

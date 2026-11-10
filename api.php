@@ -89,6 +89,7 @@ function getEndpointsfpppluginYardSecurity()
         array('method' => 'GET', 'endpoint' => 'areanames', 'callback' => 'yardSecApiAreaNames'),
         array('method' => 'GET', 'endpoint' => 'broker', 'callback' => 'yardSecApiBrokerStatus'),
         array('method' => 'POST', 'endpoint' => 'broker/:action', 'callback' => 'yardSecApiBrokerAction'),
+        array('method' => 'POST', 'endpoint' => 'walkthrough', 'callback' => 'yardSecApiWalkthrough'),
     );
     return $eps;
 }
@@ -108,6 +109,7 @@ function yardSecApiGetConfig()
         'config' => (object) $cfg,
         'hasShowPassword' => !empty($sec['showPassword']),
         'hasMqttPassword' => !empty($sec['mqttPassword']),
+        'walkthroughDone' => yardSecWalkthroughDone(),
     ));
 }
 
@@ -232,6 +234,25 @@ function yardSecApiAreaNames()
         }
     }
     return json($names);
+}
+
+// The first-install walkthrough shows until it is finished or skipped once.
+// Kept apart from config.json so saving settings can never reset it.
+function yardSecWalkthroughDone()
+{
+    $w = yardSecReadJson(yardSecDataDir() . '/walkthrough.json', array());
+    return !empty($w['done']);
+}
+
+// POST /api/plugin/fpp-plugin-YardSecurity/walkthrough  Body: {"done": true|false}
+function yardSecApiWalkthrough()
+{
+    $b = yardSecBody();
+    $done = !empty($b['done']);
+    if (!yardSecWriteJson(yardSecDataDir() . '/walkthrough.json', array('done' => $done), 0644)) {
+        return json(array('ok' => false, 'error' => 'Could not save'));
+    }
+    return json(array('ok' => true, 'done' => $done));
 }
 
 function yardSecApiBrokerStatus()

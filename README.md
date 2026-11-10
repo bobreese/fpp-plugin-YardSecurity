@@ -18,6 +18,7 @@ ESP32 + LD2450  ──Wi-Fi/MQTT──►  Yard-Security (FPP + this plugin)  �
 - Live radar view per sensor, with the areas drawn on it, for tuning distances while someone walks the yard.
 - FPP commands: `Yard Security - Arm`, `- Disarm`, `- Automatic`, `- Test Area` (usable in the Scheduler and playlists).
 - Optional built-in MQTT broker (FPP's preinstalled Mosquitto, password protected) turned on from the page.
+- A first-install walkthrough with live checks, replayable from a button.
 
 Requires FPP 10 or newer on the sensor box. The show player can be any FPP version with the command API.
 
@@ -43,6 +44,12 @@ Mount about 3-5 ft high, facing level across the area, with the radar board upri
 each other so their fans overlap as little as possible (they all use 24 GHz).
 
 ## Setup
+
+The first time you open **Status/Control → Yard Security**, a step-by-step **walkthrough** opens at the bottom of
+the page. It points at each part of the page in turn and shows a live check (✓) as each step is done: show player
+reached, password saved, broker on, sensors reporting, areas saved, test command accepted. Replay it any time with
+the **Walkthrough** button at the top of the page, or from **Help → Yard Security - Help**. The steps below are the
+same, for reference.
 
 ### 1. Show player
 Make two Command Presets per area (Content Setup → Command Presets), for example:
@@ -104,7 +111,7 @@ daemon + simulator; needs `mosquitto` and `python3-paho-mqtt`).
 ## Files on the device
 
 - Settings: `/home/fpp/media/plugindata/fpp-plugin-YardSecurity/config.json`; passwords in `secrets.json`
-  (mode 0600) in the same folder.
+  (mode 0600) in the same folder; `walkthrough.json` remembers that the walkthrough was finished or closed.
 - Log: `/home/fpp/media/logs/plugin-fpp-plugin-YardSecurity.log` (FPP rotates it). Debug logging is off by default.
 - Built-in broker (only while turned on): `/etc/mosquitto/conf.d/fpp-plugin-YardSecurity.conf` and
   `/etc/mosquitto/fpp-plugin-YardSecurity.passwd`. Turning it off, or uninstalling, removes both and puts
