@@ -147,6 +147,20 @@ daemon + simulator; needs `mosquitto` and `python3-paho-mqtt`).
 Versions before the move kept settings in `plugindata/fpp-plugin-YardSecurity/config.json`; updating the plugin
 moves them to the config folder automatically.
 
+## Turning the broker on from the command line
+
+`tools/broker-on.sh` does the same as **Turn on** on the page, over SSH (user `fpp`):
+
+```bash
+sudo /home/fpp/media/plugins/fpp-plugin-YardSecurity/tools/broker-on.sh
+```
+
+It makes and saves an MQTT password if none is saved yet, turns on the built-in broker (port 1883, password
+required), checks the broker accepts that user and password, and prints the `mqtt_broker`, `mqtt_username` and
+`mqtt_password` lines for the ESPHome `secrets.yaml`. A password that was already saved is left unchanged and only
+printed with `--show-password`. If the page is set to "A broker I already run", it stops; `--builtin` switches it
+to the built-in broker. Safe to run again at any time, for example after an FPP OS upgrade.
+
 ## Updates, OS upgrades and backups
 
 | | Settings | Passwords | Built-in broker |
@@ -157,7 +171,7 @@ moves them to the config folder automatically.
 | New SD card + FPP backup restore | **restored** | re-enter | turn on again |
 
 After an FPP OS upgrade, press **Reinstall All** when FPP asks (it reinstalls the MQTT library the plugin uses),
-then **Turn it back on** on the Yard Security page. The sensors reconnect with the same password, so the ESP32s
+then **Turn it back on** on the Yard Security page (or run `tools/broker-on.sh`). The sensors reconnect with the same password, so the ESP32s
 need no changes. FPP's plugin rules do not let a plugin reopen a network port on its own, so this takes a click.
 
 ## Privacy
