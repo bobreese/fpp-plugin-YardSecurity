@@ -1,0 +1,29 @@
+# Seeed Studio XIAO ESP32C3.
+#
+# Wiring (pin names as printed on the XIAO):
+#   LD2450 5V  -> 5V    (USB power passes through; the radar needs 5 V)
+#   LD2450 GND -> GND
+#   LD2450 TX  -> D7    (GPIO20, the XIAO's RX)
+#   LD2450 RX  -> D6    (GPIO21, the XIAO's TX)
+#
+# Power and flashing: the USB-C port. Use a cable that carries data, not a
+# charge-only one. Any 5 V USB-C phone charger runs the board and the radar.
+#
+# Antenna: plug the small antenna that comes with the XIAO into its U.FL
+# socket (the tiny round connector) before powering it. Without it, Wi-Fi
+# reaches only a few feet.
+#
+# The battery pads on the back are not needed when it runs from USB-C.
+
+substitutions:
+  radar_rx_pin: GPIO20
+  radar_tx_pin: GPIO21
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  # Log over the USB-C port, leaving D6/D7 for the radar.
+  hardware_uart: USB_SERIAL_JTAG

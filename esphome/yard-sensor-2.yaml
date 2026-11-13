@@ -5,4 +5,7 @@ substitutions:
   topic_prefix: yardsecurity   # must match "Topic prefix" on the plugin page
 
 packages:
+  # The board this sensor uses (the wiring is at the top of that file):
+  board: !include common/board-xiao-esp32c3.yaml
+  # board: !include common/board-esp32dev.yaml     # ESP32-WROOM-32 DevKit instead
   yardsecurity: !include common/yardsecurity-ld2450.yaml

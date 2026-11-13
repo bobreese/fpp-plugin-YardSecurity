@@ -28,19 +28,22 @@ Requires FPP 10 or newer on the sensor box. The show player can be any FPP versi
 
 | Part | Notes |
 |---|---|
-| ESP32-WROOM-32 DevKit, 38-pin (USB-C) | Use the **32U** (external antenna) where Wi-Fi is weak |
+| Seeed Studio XIAO ESP32C3 | USB-C. Plug in the small antenna that comes with it (U.FL socket) |
 | HLK-LD2450 radar | Buy with its cable |
 | Plastic weatherproof box | The radar sees through thin plastic, never metal |
-| 5V 1A USB power supply | |
+| 5V 1A USB-C power supply | A data-capable USB-C cable for flashing |
 
-Wiring (the LD2450 data pins are 3.3V, so they connect straight to the ESP32):
+Wiring, XIAO ESP32C3 (pin names as printed on the board; the radar's data pins are 3.3V, so they connect directly):
 
-| LD2450 | ESP32 |
+| LD2450 | XIAO ESP32C3 |
 |---|---|
-| 5V | 5V (VIN) |
+| 5V | 5V |
 | GND | GND |
-| TX | GPIO16 (RX2) |
-| RX | GPIO17 (TX2) |
+| TX | D7 (GPIO20) |
+| RX | D6 (GPIO21) |
+
+An ESP32-WROOM-32 / 32U DevKit works too: radar TX to GPIO16, RX to GPIO17, 5V to VIN, and in each
+`esphome/yard-sensor-N.yaml` switch the `board:` line to `common/board-esp32dev.yaml` (the line is there, commented).
 
 Mount about 3-5 ft high, facing level across the area, with the radar board upright. Point sensors away from
 each other so their fans overlap as little as possible (they all use 24 GHz).
@@ -69,8 +72,9 @@ Make two Command Presets per area (Content Setup → Command Presets), for examp
    - Built-in broker: **Turn on**.
 
 ### 3. ESP32 sensors (ESPHome)
-The files are in [`esphome/`](esphome/): `yard-sensor-1.yaml`, `-2`, `-3` and the shared
-`common/yardsecurity-ld2450.yaml`. Needs a current ESPHome (2026.x).
+The files are in [`esphome/`](esphome/): `yard-sensor-1.yaml`, `-2`, `-3`, the shared
+`common/yardsecurity-ld2450.yaml`, and one board file each sensor picks (`common/board-xiao-esp32c3.yaml`, the
+default, or `common/board-esp32dev.yaml`). Needs a current ESPHome (2026.10 or newer).
 
 1. Copy `secrets.yaml.example` to `secrets.yaml` and fill in Wi-Fi, and the same MQTT user and password as the
    plugin page. `mqtt_broker` is the Yard-Security FPP's IP address.

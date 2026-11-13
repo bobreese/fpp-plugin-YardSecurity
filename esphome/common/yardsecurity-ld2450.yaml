@@ -1,8 +1,9 @@
-# Shared config for a Yard Security sensor: ESP32 DevKit (ESP32-WROOM-32 / 32U)
-# wired to an HLK-LD2450 radar. Each sensor's own file sets device_name.
-#
-# Wiring:  LD2450 5V -> ESP32 5V (VIN)    LD2450 GND -> GND
-#          LD2450 TX -> GPIO16 (RX2)      LD2450 RX  -> GPIO17 (TX2)
+# Shared config for a Yard Security sensor: an ESP32 board wired to an
+# HLK-LD2450 radar. Each sensor's own file sets device_name and includes one
+# board file, which sets the chip and the radar's two serial pins:
+#   board-xiao-esp32c3.yaml   Seeed Studio XIAO ESP32C3 (radar on D7 / D6)
+#   board-esp32dev.yaml       ESP32-WROOM-32 / 32U DevKit (radar on GPIO16 / GPIO17)
+# The wiring for each board is at the top of its file.
 #
 # What it sends: about 4 times a second, on <prefix>/<device_name>/targets,
 #   {"c":1,"t":[[x,y],null,null]}
@@ -12,11 +13,6 @@
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
 
 logger:
   level: INFO
@@ -50,8 +46,8 @@ mqtt:
 
 uart:
   id: radar_uart
-  rx_pin: GPIO16
-  tx_pin: GPIO17
+  rx_pin: ${radar_rx_pin}   # the radar's TX wire
+  tx_pin: ${radar_tx_pin}   # the radar's RX wire
   baud_rate: 256000
   parity: NONE
   stop_bits: 1

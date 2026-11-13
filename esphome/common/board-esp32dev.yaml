@@ -1,0 +1,16 @@
+# ESP32-WROOM-32 / ESP32-WROOM-32U DevKit (38-pin).
+#
+# Wiring:
+#   LD2450 5V  -> 5V (VIN)
+#   LD2450 GND -> GND
+#   LD2450 TX  -> GPIO16 (RX2)
+#   LD2450 RX  -> GPIO17 (TX2)
+
+substitutions:
+  radar_rx_pin: GPIO16
+  radar_tx_pin: GPIO17
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
