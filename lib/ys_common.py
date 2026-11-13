@@ -1,9 +1,14 @@
 """Shared paths and config handling for fpp-plugin-YardSecurity.
 
-Everything the plugin keeps lives in <mediadir>/plugindata/fpp-plugin-YardSecurity/:
+Settings (areas, arming, connection; no passwords) live in FPP's config folder,
+<mediadir>/config/plugin.fpp-plugin-YardSecurity.json, so FPP's own settings
+backup includes them and a restore brings them back.
 
-  config.json   areas, arming and connection settings (written by the web UI)
+Everything else lives in <mediadir>/plugindata/fpp-plugin-YardSecurity/:
+
   secrets.json  show player and MQTT passwords, mode 0600 (written by the web UI)
+  config.json   where settings were kept before; read only if the new file is missing
+  broker-wanted present while the built-in broker is meant to be on
   state.json    the arm/disarm override set by FPP commands or the web UI
   daemon.sock   control socket the web UI and FPP commands talk to
   daemon.pid    pid of the running daemon
@@ -20,7 +25,11 @@ MEDIADIR = os.environ.get("MEDIADIR", "/home/fpp/media")
 LOGDIR = os.environ.get("LOGDIR", os.path.join(MEDIADIR, "logs"))
 DATADIR = os.environ.get("YS_DATADIR", os.path.join(MEDIADIR, "plugindata", REPO_NAME))
 
-CONFIG_FILE = os.path.join(DATADIR, "config.json")
+CONFIGDIR = os.environ.get("YS_CONFIGDIR", os.path.join(MEDIADIR, "config"))
+CONFIG_FILE = os.path.join(CONFIGDIR, "plugin.%s.json" % REPO_NAME)
+LEGACY_CONFIG_FILE = os.path.join(DATADIR, "config.json")
+BROKER_WANTED_FILE = os.path.join(DATADIR, "broker-wanted")
+BROKER_CONF_FILE = "/etc/mosquitto/conf.d/%s.conf" % REPO_NAME
 SECRETS_FILE = os.path.join(DATADIR, "secrets.json")
 STATE_FILE = os.path.join(DATADIR, "state.json")
 SOCKET_FILE = os.path.join(DATADIR, "daemon.sock")
@@ -193,7 +202,9 @@ def _read_json(path, default):
 
 
 def load_config():
-    return normalize_config(_read_json(CONFIG_FILE, {}))
+    if os.path.exists(CONFIG_FILE):
+        return normalize_config(_read_json(CONFIG_FILE, {}))
+    return normalize_config(_read_json(LEGACY_CONFIG_FILE, {}))
 
 
 def load_secrets():

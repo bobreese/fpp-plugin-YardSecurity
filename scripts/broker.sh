@@ -16,6 +16,11 @@ DATA_DIR="${MEDIADIR}/plugindata/fpp-plugin-YardSecurity"
 CONF="/etc/mosquitto/conf.d/fpp-plugin-YardSecurity.conf"
 PASSWD="/etc/mosquitto/fpp-plugin-YardSecurity.passwd"
 MARKER="${DATA_DIR}/broker-was-enabled"
+# Present while you want the built-in broker on. It lives in plugindata, which
+# survives an FPP OS upgrade; the files in /etc do not, so the page can offer to
+# turn the broker back on afterwards. (Never turned back on automatically: a
+# plugin may only open a network port when you ask it to.)
+WANTED="${DATA_DIR}/broker-wanted"
 PLUGIN_LOG="${LOGDIR}/plugin-fpp-plugin-YardSecurity.log"
 export MEDIADIR LOGDIR
 
@@ -56,6 +61,8 @@ EOF
         systemctl restart mosquitto > /dev/null 2>&1
         sleep 1
         if systemctl is-active --quiet mosquitto; then
+            touch "${WANTED}"
+            chown "${FPPUSER:-fpp}:${FPPGROUP:-fpp}" "${WANTED}" 2>/dev/null
             logit "built-in broker enabled on port 1883"
             say true "Built-in broker is on (port 1883, password required)."
         else
@@ -71,15 +78,16 @@ EOF
         else
             systemctl disable --now mosquitto > /dev/null 2>&1 || true
         fi
-        rm -f "${MARKER}"
+        rm -f "${MARKER}" "${WANTED}"
         logit "built-in broker disabled"
         say true "Built-in broker is off."
         ;;
     status)
-        configured=false; active=false
+        configured=false; active=false; wanted=false
         [ -f "${CONF}" ] && configured=true
+        [ -f "${WANTED}" ] && wanted=true
         systemctl is-active --quiet mosquitto 2>/dev/null && active=true
-        echo "{\"ok\": true, \"configured\": ${configured}, \"active\": ${active}}"
+        echo "{\"ok\": true, \"configured\": ${configured}, \"active\": ${active}, \"wanted\": ${wanted}}"
         ;;
     *)
         echo "usage: $0 enable|disable|status"

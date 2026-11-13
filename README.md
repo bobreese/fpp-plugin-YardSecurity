@@ -110,12 +110,33 @@ daemon + simulator; needs `mosquitto` and `python3-paho-mqtt`).
 
 ## Files on the device
 
-- Settings: `/home/fpp/media/plugindata/fpp-plugin-YardSecurity/config.json`; passwords in `secrets.json`
-  (mode 0600) in the same folder; `walkthrough.json` remembers that the walkthrough was finished or closed.
+- Settings (areas, arming, show player address, MQTT user): `/home/fpp/media/config/plugin.fpp-plugin-YardSecurity.json`.
+  Being in FPP's config folder, it is included in FPP's settings backup (Content Setup → File Manager → Backup /
+  JSON backups) and comes back with a restore.
+- Passwords (show player and MQTT): `/home/fpp/media/plugindata/fpp-plugin-YardSecurity/secrets.json`, mode 0600.
+  Not in FPP's backup, as FPP's plugin rules require; after restoring onto a new card, enter them again.
+- Also in that `plugindata` folder: `walkthrough.json` (walkthrough finished), `broker-wanted` (you turned the
+  built-in broker on), `state.json` (Arm/Disarm override).
 - Log: `/home/fpp/media/logs/plugin-fpp-plugin-YardSecurity.log` (FPP rotates it). Debug logging is off by default.
 - Built-in broker (only while turned on): `/etc/mosquitto/conf.d/fpp-plugin-YardSecurity.conf` and
   `/etc/mosquitto/fpp-plugin-YardSecurity.passwd`. Turning it off, or uninstalling, removes both and puts
   Mosquitto back the way it was.
+
+Versions before the move kept settings in `plugindata/fpp-plugin-YardSecurity/config.json`; updating the plugin
+moves them to the config folder automatically.
+
+## Updates, OS upgrades and backups
+
+| | Settings | Passwords | Built-in broker |
+|---|---|---|---|
+| FPP update | kept | kept | kept |
+| Plugin update | kept | kept | kept |
+| FPP OS upgrade | kept | kept | **off**: the page shows a banner with **Turn it back on** |
+| New SD card + FPP backup restore | **restored** | re-enter | turn on again |
+
+After an FPP OS upgrade, press **Reinstall All** when FPP asks (it reinstalls the MQTT library the plugin uses),
+then **Turn it back on** on the Yard Security page. The sensors reconnect with the same password, so the ESP32s
+need no changes. FPP's plugin rules do not let a plugin reopen a network port on its own, so this takes a click.
 
 ## Privacy
 

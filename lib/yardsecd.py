@@ -454,6 +454,7 @@ class Daemon:
         self.events = collections.deque(maxlen=40)  # memory only
         self.running = True
         self.started = time.time()
+        self.broker_lost = False
         self.apply_log_level()
         self.show = ShowLink(self)
         self.mqtt = MqttLink(self)
@@ -463,7 +464,7 @@ class Daemon:
 
     def _file_mtimes(self):
         out = []
-        for p in (C.CONFIG_FILE, C.SECRETS_FILE):
+        for p in (C.CONFIG_FILE, C.LEGACY_CONFIG_FILE, C.SECRETS_FILE):
             try:
                 out.append(os.stat(p).st_mtime_ns)
             except OSError:
@@ -489,6 +490,18 @@ class Daemon:
             log.info("Yard Security %s", "enabled" if self.cfg["enabled"] else "disabled")
         else:
             log.info("Settings reloaded")
+
+    def check_broker(self):
+        """The built-in broker's files live in /etc, which an FPP OS upgrade
+        replaces. Say so once if it was turned on but its config is gone."""
+        lost = (self.cfg["mqtt"]["mode"] == "builtin" and os.path.exists(C.BROKER_WANTED_FILE)
+                and not os.path.exists(C.BROKER_CONF_FILE))
+        if lost and not self.broker_lost:
+            log.warning("The built-in MQTT broker was turned on but its config is gone (an FPP OS "
+                        "upgrade removes it). Press 'Turn it back on' on the Yard Security page.")
+        elif self.broker_lost and not lost:
+            log.info("Built-in MQTT broker config is back")
+        self.broker_lost = lost
 
     def apply_log_level(self):
         log.setLevel(logging.DEBUG if self.cfg["logLevel"] == "debug" else logging.INFO)
@@ -567,12 +580,16 @@ class Daemon:
         log.info("Yard Security daemon started (pid %d)%s", os.getpid(),
                  "" if self.cfg["enabled"] else "; plugin is turned off")
         last_reload = 0.0
+        last_broker = 0.0
         while self.running:
             t = time.monotonic()
             if t - last_reload >= 2.0:
                 last_reload = t
                 self.reload()
                 self.mqtt.apply(self.cfg, self.secrets)
+            if t - last_broker >= 30.0:
+                last_broker = t
+                self.check_broker()
             try:
                 self.tick()
             except Exception:  # noqa: BLE001 - keep the daemon alive, but say why
@@ -670,6 +687,7 @@ class Daemon:
                 "mode": self.cfg["arming"]["mode"],
                 "show": {"host": self.cfg["show"]["host"], "status": self.show.status_name,
                          "reachable": self.show.reachable, "lastCheck": self.show.last_check},
+                "brokerLost": self.broker_lost,
                 "mqtt": {"connected": self.mqtt.connected, "error": self.mqtt.error,
                          "host": (self.mqtt.settings or [""])[0], "pahoMissing": mqtt is None},
                 "sensors": sensors,

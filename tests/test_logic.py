@@ -124,5 +124,46 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(Y.build_command(c["areas"][0]["onEnter"]), ("Trigger Command Preset", ["Drive On"]))
 
 
+class ConfigLocationTests(unittest.TestCase):
+    """Settings live in config/plugin.fpp-plugin-YardSecurity.json (in FPP's
+    backup); plugindata/config.json is only read when that file is missing."""
+
+    def setUp(self):
+        import importlib
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        os.environ["MEDIADIR"] = self.tmp.name
+        os.environ.pop("YS_DATADIR", None)
+        os.environ.pop("YS_CONFIGDIR", None)
+        self.C = importlib.reload(C)
+
+    def tearDown(self):
+        import importlib
+        self.tmp.cleanup()
+        os.environ.pop("MEDIADIR", None)
+        importlib.reload(C)
+
+    def write(self, path, name):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write('{"areas": [{"name": "%s"}]}' % name)
+
+    def test_paths(self):
+        self.assertEqual(self.C.CONFIG_FILE, os.path.join(self.tmp.name, "config", "plugin.fpp-plugin-YardSecurity.json"))
+        self.assertEqual(self.C.LEGACY_CONFIG_FILE, os.path.join(self.tmp.name, "plugindata", "fpp-plugin-YardSecurity", "config.json"))
+
+    def test_legacy_used_when_new_missing(self):
+        self.write(self.C.LEGACY_CONFIG_FILE, "Old")
+        self.assertEqual(self.C.load_config()["areas"][0]["name"], "Old")
+
+    def test_new_file_wins(self):
+        self.write(self.C.LEGACY_CONFIG_FILE, "Old")
+        self.write(self.C.CONFIG_FILE, "New")
+        self.assertEqual(self.C.load_config()["areas"][0]["name"], "New")
+
+    def test_nothing_saved(self):
+        self.assertEqual(self.C.load_config()["areas"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

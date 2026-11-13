@@ -21,7 +21,7 @@
 
     var cfg = null;
     var presetInfo = { loaded: false, ok: false, count: 0, error: '' };
-    var brokerInfo = { loaded: false, configured: false, active: false };
+    var brokerInfo = { loaded: false, configured: false, active: false, wanted: false };
     var configInfo = { hasMqttPassword: false, hasShowPassword: false, walkthroughDone: true };
     var lastStatus = null;
     var dirty = false;
@@ -334,10 +334,22 @@
 
     function refreshBroker() {
         api('broker').then(function (r) {
-            brokerInfo = { loaded: true, configured: !!r.configured, active: !!r.active };
-            var s = !r.ok ? 'unknown' : (r.configured ? (r.active ? 'on' : 'configured, but Mosquitto is not running') : 'off');
+            brokerInfo = { loaded: true, configured: !!r.configured, active: !!r.active, wanted: !!r.wanted };
+            var s = !r.ok ? 'unknown' : (r.configured ? (r.active ? 'on' : 'configured, but Mosquitto is not running') :
+                (r.wanted ? 'off (removed by an FPP OS upgrade?)' : 'off'));
             $('ys-broker-state').textContent = s;
+            showBrokerLost();
         }).catch(function () { $('ys-broker-state').textContent = 'unknown'; });
+    }
+
+    // An FPP OS upgrade replaces /etc, which removes the built-in broker's
+    // settings. The plugin remembers it was on; offer to turn it back on.
+    function brokerLost() {
+        return !!(cfg && cfg.mqtt.mode === 'builtin' && brokerInfo.loaded && brokerInfo.wanted && !brokerInfo.configured);
+    }
+
+    function showBrokerLost() {
+        $('ys-broker-lost').classList.toggle('d-none', !brokerLost());
     }
 
     // ------------------------------------------------------------------ status
@@ -447,8 +459,12 @@
         }).join('') : '<tr><td class="text-body-secondary">Nothing yet.</td></tr>';
     }
 
+    var pollCount = 0;
+
     function poll() {
         if (document.hidden) { return; }
+        pollCount++;
+        if (pollCount % 30 === 0) { refreshBroker(); }
         api('status').then(renderStatus).catch(function () { /* keep the last view */ });
     }
 
@@ -532,6 +548,17 @@
             var f = $('ys-mqtt-password');
             f.type = f.type === 'password' ? 'text' : 'password';
             this.textContent = f.type === 'password' ? 'Show' : 'Hide';
+        });
+
+        $('ys-broker-restore').addEventListener('click', function () {
+            var btn = this;
+            btn.disabled = true;
+            api('broker/enable', 'POST', {}).then(function (r) {
+                toast(r.message, !!r.ok);
+                btn.disabled = false;
+                refreshBroker();
+                poll();
+            }).catch(function () { btn.disabled = false; toast('Could not turn the broker on', false); });
         });
 
         $('ys-broker-on').addEventListener('click', function () {

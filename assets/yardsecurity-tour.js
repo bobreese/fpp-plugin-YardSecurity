@@ -106,6 +106,7 @@
                 if (!b.loaded) { return ['wait', 'Checking...']; }
                 if (b.configured && b.active) { return ['ok', 'Built-in broker is on']; }
                 if (b.configured) { return ['warn', 'Turned on, but Mosquitto is not running']; }
+                if (b.wanted) { return ['warn', 'It was on, but an FPP OS upgrade removed it: press Turn on']; }
                 return ['wait', 'Built-in broker is off'];
             }
         },

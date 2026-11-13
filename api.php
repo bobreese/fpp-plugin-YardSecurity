@@ -13,6 +13,30 @@ function yardSecDataDir()
     return $media . '/plugindata/fpp-plugin-YardSecurity';
 }
 
+// Settings live in FPP's config folder so FPP's settings backup includes
+// them (it backs up every config/plugin.* text file). Passwords stay in
+// plugindata/, which the backup never copies.
+function yardSecConfigFile()
+{
+    global $settings;
+    if (!empty($settings['configDirectory'])) {
+        $dir = $settings['configDirectory'];
+    } else {
+        $dir = (isset($settings['mediaDirectory']) ? $settings['mediaDirectory'] : '/home/fpp/media') . '/config';
+    }
+    return $dir . '/plugin.fpp-plugin-YardSecurity.json';
+}
+
+// The settings, from the config folder, or from where older versions kept them.
+function yardSecLoadConfig()
+{
+    $file = yardSecConfigFile();
+    if (is_file($file)) {
+        return yardSecReadJson($file, array());
+    }
+    return yardSecReadJson(yardSecDataDir() . '/config.json', array());
+}
+
 function yardSecPluginDir()
 {
     return __DIR__;
@@ -103,7 +127,7 @@ function yardSecApiStatus()
 // GET /api/plugin/fpp-plugin-YardSecurity/config  (passwords are never returned)
 function yardSecApiGetConfig()
 {
-    $cfg = yardSecReadJson(yardSecDataDir() . '/config.json', array());
+    $cfg = yardSecLoadConfig();
     $sec = yardSecReadJson(yardSecDataDir() . '/secrets.json', array());
     return json(array(
         'config' => (object) $cfg,
@@ -133,7 +157,7 @@ function yardSecApiSaveConfig()
         return json(array('ok' => false, 'error' => 'The MQTT broker address should be a hostname or IP address'));
     }
     $dir = yardSecDataDir();
-    $old = yardSecReadJson($dir . '/config.json', array());
+    $old = yardSecLoadConfig();
     $sec = yardSecReadJson($dir . '/secrets.json', array());
     $secChanged = false;
     foreach (array('showPassword', 'mqttPassword') as $k) {
@@ -145,8 +169,12 @@ function yardSecApiSaveConfig()
     if ($secChanged && !yardSecWriteJson($dir . '/secrets.json', $sec, 0600)) {
         return json(array('ok' => false, 'error' => 'Could not save the passwords in ' . $dir));
     }
-    if (!yardSecWriteJson($dir . '/config.json', $cfg, 0644)) {
-        return json(array('ok' => false, 'error' => 'Could not save the settings in ' . $dir));
+    if (!yardSecWriteJson(yardSecConfigFile(), $cfg, 0644)) {
+        return json(array('ok' => false, 'error' => 'Could not save the settings in ' . dirname(yardSecConfigFile())));
+    }
+    // Settings have moved to the config folder; drop the copy older versions kept.
+    if (is_file($dir . '/config.json')) {
+        @unlink($dir . '/config.json');
     }
 
     $result = array('ok' => true);
@@ -187,7 +215,7 @@ function yardSecApiTest()
 // GET /api/plugin/fpp-plugin-YardSecurity/presets  -> the show player's Command Preset names
 function yardSecApiPresets()
 {
-    $cfg = yardSecReadJson(yardSecDataDir() . '/config.json', array());
+    $cfg = yardSecLoadConfig();
     $sec = yardSecReadJson(yardSecDataDir() . '/secrets.json', array());
     $host = isset($cfg['show']['host']) ? $cfg['show']['host'] : '';
     if (isset($_GET['host']) && yardSecValidHost($_GET['host'])) {
@@ -224,7 +252,7 @@ function yardSecApiPresets()
 // GET /api/plugin/fpp-plugin-YardSecurity/areanames  (for the "Test Area" command's list)
 function yardSecApiAreaNames()
 {
-    $cfg = yardSecReadJson(yardSecDataDir() . '/config.json', array());
+    $cfg = yardSecLoadConfig();
     $names = array();
     if (isset($cfg['areas']) && is_array($cfg['areas'])) {
         foreach ($cfg['areas'] as $a) {
@@ -237,7 +265,7 @@ function yardSecApiAreaNames()
 }
 
 // The first-install walkthrough shows until it is finished or skipped once.
-// Kept apart from config.json so saving settings can never reset it.
+// Kept apart from the settings file so saving settings can never reset it.
 function yardSecWalkthroughDone()
 {
     $w = yardSecReadJson(yardSecDataDir() . '/walkthrough.json', array());
