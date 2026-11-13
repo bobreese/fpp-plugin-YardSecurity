@@ -99,6 +99,24 @@ For **FPP Scheduler** mode, add schedule entries on the Yard-Security FPP (Conte
 
 ## Testing without hardware
 
+### Simulate button (easiest)
+Press **Simulate** on the Yard Security page, choose how long (2-30 minutes), and **Start simulation**. A pretend
+person walks into every area and back out, again and again: one pretend sensor for each sensor your areas use,
+shown as **simulated** in the live view.
+
+- Nothing else is needed: no ESP32s, MQTT broker, password or arming, and it works while Yard Security is
+  switched off. The arming mode is ignored while it runs.
+- An area with an empty **Sensor** box is given the next free name (`yard-sensor-1`, `-2`, ...), the names the
+  ESPHome files use, and saved.
+- The walk is sized to each area: it crosses the trigger distance, stops inside the area (and its side limits),
+  and stays away long enough for the hold time and cooldown, so every walk-in lights the area.
+- **Send the areas' commands to the show player** (on by default) turns your real lights on and off. Untick it to
+  watch the areas go LIT on the page only; then nothing at all is sent, not even an "off" at the end.
+- It stops by itself when the time is up, with **Stop simulation**, or when fppd stops; lit areas are turned off.
+  Real sensor data for the same names is ignored while it runs.
+
+### Simulator script (tests the MQTT path too)
+
 `tools/simulate.py` pretends to be sensors (a person walking in and out every 24 s):
 
 ```bash

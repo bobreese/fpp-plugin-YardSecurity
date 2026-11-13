@@ -26,6 +26,11 @@
                 <li>Turn <b>Yard Security is on</b> on, choose when it is armed, and save.</li>
             </ol>
 
+            <h3 class="h6">Trying it without sensors</h3>
+            <p>Press <b>Simulate</b> on the Yard Security page: a pretend person walks into each area and back out, so you
+            can watch the live view and the areas light, with or without sending the commands to your show player. It
+            needs no ESP32s, broker or arming, and stops by itself after the time you choose.</p>
+
             <h3 class="h6">Arming</h3>
             <ul>
                 <li><b>After the show is over</b>: armed whenever the show player is idle or switched off, after the wait you set.</li>

@@ -124,6 +124,51 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(Y.build_command(c["areas"][0]["onEnter"]), ("Trigger Command Preset", ["Drive On"]))
 
 
+class SimulationTests(unittest.TestCase):
+    def run_area(self, areas, seconds, step=0.1):
+        """Feed the simulated walk through each area's tracker; return its actions."""
+        plan = Y.sim_plan(areas)
+        trackers = [Y.AreaTracker() for _ in areas]
+        out = [[] for _ in areas]
+        t = 0.0
+        while t < seconds:
+            pos = Y.sim_position(plan, t)
+            for i, a in enumerate(areas):
+                present = pos is not None and Y.target_in_area(a, pos[0], pos[1])
+                for act in trackers[i].update(a, t, present, True)[1]:
+                    out[i].append((round(t, 1), act))
+            t += step
+        return plan, out
+
+    def test_every_walk_in_lights_with_default_cooldown(self):
+        a = area(maxFt=15)  # defaults: 300 ms enter, 5 s hold, 30 s cooldown
+        plan, (acts,) = self.run_area([a], 3 * 1000)
+        self.assertGreaterEqual(plan["cycle"], 30)
+        kinds = [k for _, k in acts]
+        self.assertEqual(kinds[:6], ["enter", "exit"] * 3)
+        cycles = int(3000 // plan["cycle"])
+        self.assertIn(kinds.count("enter"), (cycles, cycles + 1))
+
+    def test_stops_inside_min_distance_and_side_limits(self):
+        a = area(minFt=5, maxFt=10, leftFt=1, rightFt=1, cooldownSec=0)
+        plan, (acts,) = self.run_area([a], 200)
+        self.assertTrue(5 < plan["near"] < 10)
+        self.assertLessEqual(plan["sway"], 0.5)
+        self.assertIn("enter", [k for _, k in acts])
+
+    def test_two_areas_on_one_sensor(self):
+        near = area(maxFt=8, cooldownSec=0)
+        far = area(minFt=0, maxFt=20, cooldownSec=0)
+        plan, (a1, a2) = self.run_area([near, far], 200)
+        self.assertIn("enter", [k for _, k in a1])
+        self.assertIn("enter", [k for _, k in a2])
+
+    def test_away_part_of_cycle(self):
+        plan = Y.sim_plan([area(maxFt=15)])
+        self.assertIsNone(Y.sim_position(plan, plan["cycle"] - 0.5))
+        self.assertIsNotNone(Y.sim_position(plan, 0.1))
+
+
 class ConfigLocationTests(unittest.TestCase):
     """Settings live in config/plugin.fpp-plugin-YardSecurity.json (in FPP's
     backup); plugindata/config.json is only read when that file is missing."""

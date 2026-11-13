@@ -396,6 +396,9 @@
     // Why the live view is empty (or stale), most basic reason first.
     function sensorsNote(st, haveCards) {
         var mq = st.mqtt || {};
+        if (st.sim && st.sim.active) {
+            return '';  // pretend sensors need no broker and run while switched off
+        }
         var warn = function (html) {
             return '<div class="col-12"><div class="alert alert-warning mb-0">' + html + '</div></div>';
         };
@@ -438,7 +441,8 @@
         $('ys-sensors').innerHTML = note + names.map(function (n, idx) {
             var s = (st.sensors || {})[n] || { online: false, targets: [], ageSec: null };
             var state;
-            if (s.ageSec === null || s.ageSec === undefined) { state = '<span class="badge text-bg-secondary">never heard from</span>'; }
+            if (s.simulated) { state = '<span class="badge text-bg-info">simulated</span>'; }
+            else if (s.ageSec === null || s.ageSec === undefined) { state = '<span class="badge text-bg-secondary">never heard from</span>'; }
             else if (!s.online) { state = '<span class="badge text-bg-danger">offline</span>'; }
             else if (!s.radarOk) { state = '<span class="badge text-bg-danger">radar not answering</span>'; }
             else if (s.ageSec > 2) { state = '<span class="badge text-bg-warning">no data for ' + Math.round(s.ageSec) + ' s</span>'; }
@@ -469,8 +473,17 @@
             return;
         }
         var b = $('ys-armed-badge');
-        b.className = 'badge fs-6 ' + (st.armed ? 'text-bg-success' : 'text-bg-secondary');
-        b.textContent = st.armed ? 'ARMED' : 'Disarmed';
+        var sim = st.sim || { active: false };
+        b.className = 'badge fs-6 ' + (sim.active ? 'text-bg-info' : (st.armed ? 'text-bg-success' : 'text-bg-secondary'));
+        b.textContent = sim.active ? 'SIMULATING' : (st.armed ? 'ARMED' : 'Disarmed');
+        $('ys-sim-running').classList.toggle('d-none', !sim.active);
+        if (sim.active) {
+            var left = sim.secondsLeft || 0;
+            $('ys-sim-text').textContent = (sim.sensors || []).join(', ') + ' - ' + Math.floor(left / 60) + ':' +
+                ('0' + (left % 60)).slice(-2) + ' left - ' +
+                (sim.sendCommands ? 'commands are sent to the show player' : 'commands are NOT sent (lights stay as they are)');
+            $('ys-sim-form').classList.add('d-none');
+        }
         $('ys-arm-reason').textContent = st.armReason + (st.override ? ' - press Automatic to go back to the arming mode.' : '');
         var sh = st.show || {};
         $('ys-show-status').textContent = !sh.host ? 'not set' : sh.host + ' - ' + (sh.reachable ? sh.status : (sh.status === 'unknown' ? 'not checked yet' : 'not answering'));
@@ -577,6 +590,31 @@
             var f = $('ys-mqtt-password');
             f.type = f.type === 'password' ? 'text' : 'password';
             this.textContent = f.type === 'password' ? 'Show' : 'Hide';
+        });
+
+        $('ys-sim-open').addEventListener('click', function () {
+            $('ys-sim-form').classList.toggle('d-none');
+        });
+        $('ys-sim-cancel').addEventListener('click', function () {
+            $('ys-sim-form').classList.add('d-none');
+        });
+        $('ys-sim-start').addEventListener('click', function () {
+            if (dirty) { toast('Save settings first, then simulate', false); return; }
+            var send = $('ys-sim-send').checked;
+            api('simulate', 'POST', { minutes: parseInt($('ys-sim-minutes').value, 10), sendCommands: send }).then(function (r) {
+                if (!r.ok) { toast(r.error || 'Could not start the simulation', false); return; }
+                $('ys-sim-form').classList.add('d-none');
+                var msg = 'Simulating ' + (r.sensors || []).join(', ');
+                if (r.assigned && r.assigned.length) {
+                    msg += '. Sensor names given: ' + r.assigned.map(function (x) { return x.area + ' \u2192 ' + x.sensor; }).join(', ');
+                    loadConfig();  // show the new sensor names in the areas
+                }
+                toast(msg);
+                poll();
+            }).catch(function () { toast('Could not start the simulation', false); });
+        });
+        $('ys-sim-stop').addEventListener('click', function () {
+            api('simstop', 'POST', {}).then(function () { poll(); });
         });
 
         $('ys-broker-restore').addEventListener('click', function () {

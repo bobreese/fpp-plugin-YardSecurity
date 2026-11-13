@@ -29,6 +29,42 @@
                 <button type="button" class="btn btn-success" data-ys-cmd="arm">Arm now</button>
                 <button type="button" class="btn btn-danger" data-ys-cmd="disarm">Disarm now</button>
                 <button type="button" class="btn btn-outline-secondary" data-ys-cmd="auto">Automatic</button>
+                <button type="button" class="btn btn-outline-info ms-md-auto" id="ys-sim-open">Simulate</button>
+            </div>
+            <div id="ys-sim-form" class="border rounded p-3 mb-3 d-none">
+                <h3 class="h6">Simulate sensors</h3>
+                <p class="small mb-2">
+                    A pretend person walks into every area and back out, again and again: one pretend sensor for each
+                    sensor your areas use. No ESP32s, broker, password or arming are needed, and it works while Yard
+                    Security is switched off. An area with no sensor yet is given the next free name
+                    (<code>yard-sensor-1</code>, <code>-2</code>, ...), the same names the ESPHome files use.
+                </p>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <label for="ys-sim-minutes">Run for</label>
+                    <select class="form-select w-auto" id="ys-sim-minutes">
+                        <option value="2">2 minutes</option>
+                        <option value="5" selected>5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                    </select>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="ys-sim-send" checked>
+                    <label class="form-check-label" for="ys-sim-send">
+                        Send the areas' commands to the show player (your <b>real lights</b> turn on and off)
+                    </label>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-info" id="ys-sim-start">Start simulation</button>
+                    <button type="button" class="btn btn-outline-secondary" id="ys-sim-cancel">Cancel</button>
+                </div>
+            </div>
+            <div id="ys-sim-running" class="alert alert-info d-none" role="status">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="me-auto"><b>Simulation running</b>: <span id="ys-sim-text"></span></div>
+                    <button type="button" class="btn btn-sm btn-light" id="ys-sim-stop">Stop simulation</button>
+                </div>
             </div>
             <div class="row g-2 small">
                 <div class="col-12 col-md-4"><span class="text-body-secondary">Show player:</span> <span id="ys-show-status">...</span></div>

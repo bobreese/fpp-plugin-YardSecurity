@@ -149,6 +149,52 @@ def compute_armed(cfg, override, show_busy, idle_since, now, minutes_now):
     return True, "Show is over"
 
 
+# --------------------------------------------------------------------------
+# Built-in simulation: a pretend person per sensor, no hardware or broker
+# --------------------------------------------------------------------------
+
+SIM_SPEED_FTS = 2.0   # walking speed
+SIM_STAND_SEC = 4.0   # how long they stop inside the area
+
+
+def sim_plan(areas):
+    """How the pretend person walks for one sensor, from the areas using it:
+    in from beyond the furthest trigger distance, stop where every area
+    sees them, back out, and stay away long enough for the hold time and
+    cooldown to finish so the next walk-in lights the area again."""
+    lo = max(a["minFt"] for a in areas)
+    hi = min(a["maxFt"] for a in areas)
+    if lo < hi:
+        near = max(1.0, lo + (hi - lo) * 0.4)
+    else:  # areas that do not overlap: stop inside the first one
+        near = max(1.0, (areas[0]["minFt"] + areas[0]["maxFt"]) / 2.0)
+    far = min(25.0, max(a["maxFt"] for a in areas) + 6.0)
+    limits = [v for a in areas for v in (a["leftFt"], a["rightFt"]) if v > 0]
+    sway = min([2.0] + [v * 0.5 for v in limits])
+    walk = (far - near) / SIM_SPEED_FTS
+    busy = walk + SIM_STAND_SEC + walk
+    hold = max(a["holdSec"] for a in areas)
+    cooldown = max(a["cooldownSec"] for a in areas)
+    gone = max(6.0, hold + 3.0, cooldown - busy + 2.0)
+    return {"far": far, "near": near, "sway": sway, "walk": walk, "cycle": busy + gone}
+
+
+def sim_position(plan, t):
+    """(x_mm, y_mm) of the pretend person t seconds into the simulation, or None when away."""
+    c = t % plan["cycle"]
+    walk = plan["walk"]
+    if c < walk:
+        y = plan["far"] - SIM_SPEED_FTS * c
+    elif c < walk + SIM_STAND_SEC:
+        y = plan["near"]
+    elif c < 2 * walk + SIM_STAND_SEC:
+        y = plan["near"] + SIM_SPEED_FTS * (c - walk - SIM_STAND_SEC)
+    else:
+        return None
+    x = plan["sway"] * math.sin(c / 2.0)
+    return x * C.MM_PER_FT, y * C.MM_PER_FT
+
+
 def build_command(action):
     """Area action -> (command name, [args]) for the show player, or None."""
     if action.get("type") == "preset":
@@ -455,6 +501,7 @@ class Daemon:
         self.running = True
         self.started = time.time()
         self.broker_lost = False
+        self.sim = None  # running simulation, memory only
         self.apply_log_level()
         self.show = ShowLink(self)
         self.mqtt = MqttLink(self)
@@ -527,6 +574,8 @@ class Daemon:
 
     def sensor_targets(self, device, targets, radar_ok):
         with self.lock:
+            if self.sim and device in self.sim["sensors"]:
+                return  # the simulation owns this sensor name for now
             s = self._sensor(device)
             s["online"] = True
             s["targets"] = targets
@@ -556,8 +605,19 @@ class Daemon:
         lt = time.localtime()
         with self.lock:
             cfg = self.cfg
-            armed, reason = compute_armed(cfg, self.override, self.show.busy, self.show.idle_since,
-                                          now, lt.tm_hour * 60 + lt.tm_min)
+            if self.sim and now >= self.sim["until"]:
+                self.stop_sim("time is up")
+            if self.sim:
+                t = now - self.sim["started"]
+                for name, sp in self.sim["sensors"].items():
+                    pos = sim_position(sp["plan"], t + sp["offset"])
+                    s = self._sensor(name)
+                    s.update({"online": True, "radarOk": True, "ts": now, "simulated": True,
+                              "targets": [pos] if pos else []})
+                armed, reason = True, "Simulation running" + ("" if self.sim["send"] else " (commands not sent)")
+            else:
+                armed, reason = compute_armed(cfg, self.override, self.show.busy, self.show.idle_since,
+                                              now, lt.tm_hour * 60 + lt.tm_min)
             if armed != self.armed:
                 log.info("%s: %s", "ARMED" if armed else "Disarmed", reason)
                 self.add_event("armed" if armed else "disarmed", "", reason)
@@ -565,7 +625,7 @@ class Daemon:
             for area in cfg["areas"]:
                 tr = self.trackers.setdefault(area["id"], AreaTracker())
                 present = False
-                if cfg["enabled"] and area["enabled"]:
+                if (cfg["enabled"] or self.sim) and area["enabled"]:
                     targets = self._fresh_targets(area["sensor"], now)
                     present = bool(targets) and any(target_in_area(area, x, y) for x, y in targets)
                 events, actions = tr.update(area, now, present, armed and area["enabled"])
@@ -573,8 +633,55 @@ class Daemon:
                     log.debug("%s: %s", area["name"], "someone entered" if e == "occupied" else "clear")
                     self.add_event(e, area["name"])
                 for a in actions:
-                    self.show.send(area["name"] + (" enter" if a == "enter" else " exit"),
+                    self.do_action(area["name"] + (" enter" if a == "enter" else " exit"),
                                    area["onEnter"] if a == "enter" else area["onExit"])
+
+    def do_action(self, label, action):
+        if self.sim and not self.sim["send"]:
+            if build_command(action):
+                self.add_event("simulated", label, "not sent: simulation without commands")
+            return
+        self.show.send(label, action)
+
+    # ---- built-in simulation ------------------------------------------------
+
+    def start_sim(self, minutes, send):
+        with self.lock:
+            if self.sim:
+                self.stop_sim("restarted")
+            groups = {}
+            for a in self.cfg["areas"]:
+                if a["enabled"] and a["sensor"]:
+                    groups.setdefault(a["sensor"], []).append(a)
+            if not groups:
+                return {"ok": False, "error": "No area has a sensor to simulate. Add an area and save first."}
+            now = time.monotonic()
+            sensors = {}
+            for i, name in enumerate(sorted(groups)):
+                sensors[name] = {"plan": sim_plan(groups[name]), "offset": -3.0 * i}  # staggered starts
+            self.sim = {"started": now, "until": now + minutes * 60.0, "send": bool(send),
+                        "sensors": sensors, "minutes": minutes}
+        log.info("Simulation started: %s for %d min, commands %s", ", ".join(sorted(sensors)), minutes,
+                 "sent to the show player" if send else "not sent")
+        self.add_event("test", "", "simulation started (%s)" % ", ".join(sorted(sensors)))
+        return {"ok": True, "sensors": sorted(sensors)}
+
+    def stop_sim(self, why):
+        """Caller holds self.lock (or this is the only thread left)."""
+        sim = self.sim
+        if not sim:
+            return
+        self.sim = None
+        for name in sim["sensors"]:
+            self.sensors.pop(name, None)
+        if not sim["send"]:
+            # Nothing was sent, so there is nothing to turn off.
+            for a in self.cfg["areas"]:
+                if a["sensor"] in sim["sensors"]:
+                    self.trackers[a["id"]] = AreaTracker()
+        # With commands on, the normal exit path turns lit areas off.
+        log.info("Simulation stopped (%s)", why)
+        self.add_event("test", "", "simulation stopped (%s)" % why)
 
     def run(self):
         log.info("Yard Security daemon started (pid %d)%s", os.getpid(),
@@ -600,6 +707,7 @@ class Daemon:
     def shutdown(self):
         # Turn off anything this daemon turned on.
         with self.lock:
+            self.stop_sim("service stopping")
             for area in self.cfg["areas"]:
                 tr = self.trackers.get(area["id"])
                 if tr and tr.fired:
@@ -654,6 +762,16 @@ class Daemon:
             self.add_event("test", area["name"], phase)
             log.info("Test of %s (%s)", area["name"], phase)
             return {"ok": True}
+        if cmd == "simulate":
+            try:
+                minutes = int(req.get("minutes", 5))
+            except (TypeError, ValueError):
+                minutes = 5
+            return self.start_sim(max(1, min(60, minutes)), bool(req.get("sendCommands", True)))
+        if cmd == "simstop":
+            with self.lock:
+                self.stop_sim("stopped from the page")
+            return {"ok": True}
         return {"ok": False, "error": "unknown command"}
 
     def status(self):
@@ -665,6 +783,7 @@ class Daemon:
                 sensors[name] = {
                     "online": s["online"],
                     "radarOk": s["radarOk"],
+                    "simulated": bool(s.get("simulated")),
                     "ageSec": age,
                     "targets": [{"xFt": round(x / C.MM_PER_FT, 2), "yFt": round(y / C.MM_PER_FT, 2),
                                  "distFt": round(math.hypot(x, y) / C.MM_PER_FT, 2)}
@@ -688,6 +807,9 @@ class Daemon:
                 "show": {"host": self.cfg["show"]["host"], "status": self.show.status_name,
                          "reachable": self.show.reachable, "lastCheck": self.show.last_check},
                 "brokerLost": self.broker_lost,
+                "sim": {"active": True, "secondsLeft": int(max(0, self.sim["until"] - now)),
+                        "sendCommands": self.sim["send"], "sensors": sorted(self.sim["sensors"])}
+                if self.sim else {"active": False},
                 "mqtt": {"connected": self.mqtt.connected, "error": self.mqtt.error,
                          "host": (self.mqtt.settings or [""])[0], "pahoMissing": mqtt is None},
                 "sensors": sensors,

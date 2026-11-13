@@ -114,6 +114,8 @@ function getEndpointsfpppluginYardSecurity()
         array('method' => 'GET', 'endpoint' => 'broker', 'callback' => 'yardSecApiBrokerStatus'),
         array('method' => 'POST', 'endpoint' => 'broker/:action', 'callback' => 'yardSecApiBrokerAction'),
         array('method' => 'POST', 'endpoint' => 'walkthrough', 'callback' => 'yardSecApiWalkthrough'),
+        array('method' => 'POST', 'endpoint' => 'simulate', 'callback' => 'yardSecApiSimulate'),
+        array('method' => 'POST', 'endpoint' => 'simstop', 'callback' => 'yardSecApiSimStop'),
     );
     return $eps;
 }
@@ -281,6 +283,54 @@ function yardSecApiWalkthrough()
         return json(array('ok' => false, 'error' => 'Could not save'));
     }
     return json(array('ok' => true, 'done' => $done));
+}
+
+// POST /api/plugin/fpp-plugin-YardSecurity/simulate
+// Body: {"minutes": 5, "sendCommands": true}
+// Pretend a person walks into every area, one pretend sensor per sensor name,
+// with no ESP32, broker or arming needed. An area with no sensor yet is given
+// the next free yard-sensor-N name (the names the ESPHome files use) and saved.
+function yardSecApiSimulate()
+{
+    $b = yardSecBody();
+    $cfg = yardSecLoadConfig();
+    $areas = (isset($cfg['areas']) && is_array($cfg['areas'])) ? $cfg['areas'] : array();
+    if (count($areas) == 0) {
+        return json(array('ok' => false, 'error' => 'Add an area and save first.'));
+    }
+    $used = array();
+    foreach ($areas as $a) {
+        if (!empty($a['sensor'])) {
+            $used[strtolower($a['sensor'])] = true;
+        }
+    }
+    $assigned = array();
+    foreach ($areas as $i => $a) {
+        if (empty($a['sensor'])) {
+            for ($n = 1; isset($used['yard-sensor-' . $n]); $n++) {
+            }
+            $areas[$i]['sensor'] = 'yard-sensor-' . $n;
+            $used['yard-sensor-' . $n] = true;
+            $assigned[] = array('area' => isset($a['name']) ? $a['name'] : ('Area ' . ($i + 1)), 'sensor' => 'yard-sensor-' . $n);
+        }
+    }
+    if (count($assigned)) {
+        $cfg['areas'] = $areas;
+        if (!yardSecWriteJson(yardSecConfigFile(), $cfg, 0644)) {
+            return json(array('ok' => false, 'error' => 'Could not save the sensor names'));
+        }
+        yardSecDaemon(array('cmd' => 'reload'));
+    }
+    $minutes = isset($b['minutes']) ? intval($b['minutes']) : 5;
+    $send = !isset($b['sendCommands']) || !empty($b['sendCommands']);
+    $r = yardSecDaemon(array('cmd' => 'simulate', 'minutes' => $minutes, 'sendCommands' => $send));
+    $r['assigned'] = $assigned;
+    return json($r);
+}
+
+function yardSecApiSimStop()
+{
+    return json(yardSecDaemon(array('cmd' => 'simstop')));
 }
 
 function yardSecApiBrokerStatus()
