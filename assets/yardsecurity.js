@@ -393,6 +393,34 @@
         return parts.join('');
     }
 
+    // Why the live view is empty (or stale), most basic reason first.
+    function sensorsNote(st, haveCards) {
+        var mq = st.mqtt || {};
+        var warn = function (html) {
+            return '<div class="col-12"><div class="alert alert-warning mb-0">' + html + '</div></div>';
+        };
+        if (!st.enabled) {
+            return warn('<b>Yard Security is switched off, so it is not listening to the sensors.</b> ' +
+                'Turn on <b>Yard Security is on</b> under Settings and press <b>Save settings</b>.');
+        }
+        if (mq.pahoMissing) {
+            return warn('<b>The MQTT library (python3-paho-mqtt) is missing.</b> Reinstall the plugin from the Plugin Manager.');
+        }
+        if (!mq.connected) {
+            var why = mq.error ? ' (' + esc(mq.error) + ')' : '';
+            var hint = cfg && cfg.mqtt.mode === 'builtin' && brokerInfo.loaded && !brokerInfo.configured ?
+                ' The built-in broker is off: press <b>Turn on</b> under Settings.' :
+                ' Check the broker settings, and that the MQTT password is saved.';
+            return warn('<b>Not connected to the sensor broker' + why + '.</b>' + hint);
+        }
+        if (!haveCards) {
+            var prefix = cfg ? esc(cfg.mqtt.topicPrefix) : 'yardsecurity';
+            return '<div class="col-12 text-body-secondary">Connected to the broker, but no sensors have reported yet. ' +
+                'Check that the ESP32s are powered and use the same MQTT user, password and topic prefix (<code>' + prefix + '</code>).</div>';
+        }
+        return '';
+    }
+
     function renderSensors(st) {
         var names = Object.keys(st.sensors || {});
         var areaSensors = {};
@@ -402,11 +430,12 @@
         var dl = $('ys-sensor-list');
         var opts = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
         if (dl.innerHTML !== opts) { dl.innerHTML = opts; }
+        var note = sensorsNote(st, names.length > 0);
         if (!names.length) {
-            $('ys-sensors').innerHTML = '<div class="col-12 text-body-secondary">No sensors have reported yet. Check the broker settings and that the ESP32s are powered.</div>';
+            $('ys-sensors').innerHTML = note;
             return;
         }
-        $('ys-sensors').innerHTML = names.map(function (n, idx) {
+        $('ys-sensors').innerHTML = note + names.map(function (n, idx) {
             var s = (st.sensors || {})[n] || { online: false, targets: [], ageSec: null };
             var state;
             if (s.ageSec === null || s.ageSec === undefined) { state = '<span class="badge text-bg-secondary">never heard from</span>'; }

@@ -105,6 +105,10 @@ For **FPP Scheduler** mode, add schedule entries on the Yard-Security FPP (Conte
 YS_MQTT_PASSWORD='the-password' python3 tools/simulate.py --host Yard-Security.local yard-sensor-1 yard-sensor-2
 ```
 
+It waits for the broker to accept its login: a wrong password or a broker that is off stops it with a message
+saying which. While it runs, the sensors appear under **Sensors (live)** once Yard Security is switched on (the
+page says so if it is off or not connected to the broker).
+
 Developers: `python3 -m unittest discover tests` (logic) and `tests/e2e.sh` (Mosquitto + fake show player +
 daemon + simulator; needs `mosquitto` and `python3-paho-mqtt`).
 
