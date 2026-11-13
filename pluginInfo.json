@@ -37,7 +37,7 @@
 			}
 		],
 		"closedCode": false,
-		"other": "The plugin's API on FPP's web server (no password by default) can arm, disarm and test areas, which sends light commands to your show player. With debug logging on, the plugin log records when each area is entered."
+		"other": "The plugin's API on FPP's web server (no password by default) can arm, disarm and test areas, which sends light commands to your show player. With debug logging on, the plugin log records when each area is entered. The page's Show button can display the saved sensor (MQTT) password, so it can be copied into the ESP32 settings; the show player's password is never shown."
 	},
 	"versions": [
 		{

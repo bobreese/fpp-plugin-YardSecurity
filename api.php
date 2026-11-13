@@ -116,6 +116,7 @@ function getEndpointsfpppluginYardSecurity()
         array('method' => 'POST', 'endpoint' => 'walkthrough', 'callback' => 'yardSecApiWalkthrough'),
         array('method' => 'POST', 'endpoint' => 'simulate', 'callback' => 'yardSecApiSimulate'),
         array('method' => 'POST', 'endpoint' => 'simstop', 'callback' => 'yardSecApiSimStop'),
+        array('method' => 'POST', 'endpoint' => 'mqttpassword', 'callback' => 'yardSecApiMqttPassword'),
     );
     return $eps;
 }
@@ -326,6 +327,20 @@ function yardSecApiSimulate()
     $r = yardSecDaemon(array('cmd' => 'simulate', 'minutes' => $minutes, 'sendCommands' => $send));
     $r['assigned'] = $assigned;
     return json($r);
+}
+
+// POST /api/plugin/fpp-plugin-YardSecurity/mqttpassword
+// The saved MQTT password, for the page's Show button: it goes into the
+// ESPHome secrets.yaml. POST so it is never in a URL, cache or access log;
+// never logged. The show player's password is never returned.
+function yardSecApiMqttPassword()
+{
+    header('Cache-Control: no-store');
+    $sec = yardSecReadJson(yardSecDataDir() . '/secrets.json', array());
+    if (empty($sec['mqttPassword'])) {
+        return json(array('ok' => false, 'error' => 'No MQTT password is saved yet. Press New, then Save settings.'));
+    }
+    return json(array('ok' => true, 'password' => (string) $sec['mqttPassword']));
 }
 
 function yardSecApiSimStop()

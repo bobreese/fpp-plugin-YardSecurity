@@ -25,6 +25,7 @@
     var configInfo = { hasMqttPassword: false, hasShowPassword: false, walkthroughDone: true };
     var lastStatus = null;
     var dirty = false;
+    var revealedMqttPassword = null;  // the saved password, while Show displays it
 
     function $(id) { return document.getElementById(id); }
 
@@ -272,11 +273,16 @@
         var sp = $('ys-show-password').value;
         var mp = $('ys-mqtt-password').value;
         if (sp) { body.showPassword = sp; }
-        if (mp) { body.mqttPassword = mp; }
+        // The saved password shown by Show is not a change: sending it again would
+        // rewrite the broker's password file and restart the broker for nothing.
+        if (mp && mp !== revealedMqttPassword) { body.mqttPassword = mp; }
         api('config', 'POST', body).then(function (r) {
             if (!r.ok) { toast(r.error || 'Could not save', false); return; }
             $('ys-show-password').value = '';
             $('ys-mqtt-password').value = '';
+            $('ys-mqtt-password').type = 'password';
+            $('ys-show-mqtt-password').textContent = 'Show';
+            revealedMqttPassword = null;
             setDirty(false);
             toast('Saved');
             if (r.broker) { toast(r.broker.message, r.broker.ok); refreshBroker(); }
@@ -574,6 +580,10 @@
         $('ys-save').addEventListener('click', save);
         $('ys-refresh-presets').addEventListener('click', loadPresets);
 
+        $('ys-mqtt-password').addEventListener('input', function () {
+            revealedMqttPassword = null;  // edited: now a new password to save
+        });
+
         $('ys-gen-password').addEventListener('click', function () {
             var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
             var buf = new Uint32Array(20);
@@ -581,6 +591,7 @@
             var pw = '';
             for (var i = 0; i < buf.length; i++) { pw += chars[buf[i] % chars.length]; }
             var f = $('ys-mqtt-password');
+            revealedMqttPassword = null;
             f.value = pw;
             f.type = 'text';
             $('ys-show-mqtt-password').textContent = 'Hide';
@@ -588,8 +599,38 @@
         });
         $('ys-show-mqtt-password').addEventListener('click', function () {
             var f = $('ys-mqtt-password');
-            f.type = f.type === 'password' ? 'text' : 'password';
-            this.textContent = f.type === 'password' ? 'Show' : 'Hide';
+            var btn = this;
+            if (f.type === 'text') {
+                // Hide. A shown saved password goes away again, so the box reads "(saved)".
+                if (f.value === revealedMqttPassword) { f.value = ''; }
+                revealedMqttPassword = null;
+                f.type = 'password';
+                btn.textContent = 'Show';
+                return;
+            }
+            if (f.value) {
+                // Something typed or made with New: just unmask it.
+                f.type = 'text';
+                btn.textContent = 'Hide';
+                return;
+            }
+            // Empty box: fetch the saved password, for copying into ESPHome.
+            if (!configInfo.hasMqttPassword) {
+                toast('No MQTT password is saved yet. Press New, then Save settings.', false);
+                return;
+            }
+            btn.disabled = true;
+            api('mqttpassword', 'POST', {}).then(function (r) {
+                btn.disabled = false;
+                if (!r.ok) { toast(r.error || 'Could not load the password', false); return; }
+                revealedMqttPassword = r.password;
+                f.value = r.password;
+                f.type = 'text';
+                btn.textContent = 'Hide';
+            }).catch(function () {
+                btn.disabled = false;
+                toast('Could not load the password', false);
+            });
         });
 
         $('ys-sim-open').addEventListener('click', function () {
