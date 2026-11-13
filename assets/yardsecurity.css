@@ -36,3 +36,7 @@
     /* Phones fit two small views per row: larger numbers keep them readable. */
     .ys-app #ys-sensors[data-size="small"] .ys-ring-num { font-size: 2.8px; stroke-width: 0.5px; }
 }
+
+/* Medium: rings and labels a little stronger than the base style, lighter than Small. */
+.ys-app #ys-sensors[data-size="medium"] .ys-ring { stroke: var(--bs-secondary-color); stroke-width: 0.12; stroke-dasharray: 0.6 0.4; opacity: 0.6; }
+.ys-app #ys-sensors[data-size="medium"] .ys-ring-label { font-size: 1.1px; font-weight: 600; paint-order: stroke; stroke: var(--bs-body-bg); stroke-width: 0.25px; }
