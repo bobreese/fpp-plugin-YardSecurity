@@ -404,6 +404,11 @@
             parts.push('<clipPath id="' + cid + '"><rect x="' + (-l) + '" y="' + (-VIEW_FT - 1) + '" width="' + (l + r) + '" height="' + (VIEW_FT + 2) + '"/></clipPath>');
             parts.push('<path class="ys-zone ys-zone-' + (i % 4) + '" clip-path="url(#' + cid + ')" d="' + sectorPath(Math.min(a.minFt, a.maxFt), Math.min(a.maxFt, VIEW_FT)) + '"><title>' + esc(a.name) + '</title></path>');
         });
+        // Short, larger distance labels for the Small size (CSS shows them only
+        // there), drawn over the areas so they stay readable.
+        [5, 10, 15, 20].forEach(function (r) {
+            parts.push('<text class="ys-ring-num" x="0" y="' + (-r + 1.8) + '" text-anchor="middle">' + r + '</text>');
+        });
         (s.targets || []).forEach(function (t) {
             parts.push('<circle class="ys-target" cx="' + t.xFt + '" cy="' + (-t.yFt) + '" r="0.7"/>');
         });

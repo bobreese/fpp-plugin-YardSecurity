@@ -26,4 +26,13 @@
 
 /* Sensors (live) sizes. Large: one view per row, never taller than most of the screen. */
 .ys-app #ys-sensors[data-size="large"] .ys-radar { max-height: 70vh; }
+.ys-app .ys-ring-num { display: none; }
+/* Small: the 5 ft rings bolder (still dashed) and short "5 / 10 / 15 / 20" labels, readable at that size. */
 .ys-app #ys-sensors[data-size="small"] .ys-ring-label { display: none; }
+.ys-app #ys-sensors[data-size="small"] .ys-ring { stroke: var(--bs-secondary-color); stroke-width: 0.2; stroke-dasharray: 0.8 0.5; opacity: 0.7; }
+.ys-app #ys-sensors[data-size="small"] .ys-ring-num { display: inline; fill: var(--bs-secondary-color); font-size: 1.8px; font-weight: 600;
+    paint-order: stroke; stroke: var(--bs-body-bg); stroke-width: 0.35px; }
+@media (max-width: 767.98px) {
+    /* Phones fit two small views per row: larger numbers keep them readable. */
+    .ys-app #ys-sensors[data-size="small"] .ys-ring-num { font-size: 2.8px; stroke-width: 0.5px; }
+}
