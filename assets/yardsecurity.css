@@ -23,3 +23,7 @@
     body.ys-tour-open { padding-bottom: var(--ys-tour-h, 0px); }
     body.ys-tour-open .ys-app .ys-savebar { bottom: var(--ys-tour-h, 0px); }
 }
+
+/* Sensors (live) sizes. Large: one view per row, never taller than most of the screen. */
+.ys-app #ys-sensors[data-size="large"] .ys-radar { max-height: 70vh; }
+.ys-app #ys-sensors[data-size="small"] .ys-ring-label { display: none; }

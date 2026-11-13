@@ -16,6 +16,8 @@ ESP32 + LD2450  ──Wi-Fi/MQTT──►  Yard-Security (FPP + this plugin)  �
 - Actions are Command Presets from the show player (picked from a list) or any FPP command with arguments.
 - Arming: **after the show is over** (automatic), **by the FPP Scheduler** (Arm / Disarm commands), or **always**.
 - Live radar view per sensor, with the areas drawn on it, for tuning distances while someone walks the yard.
+  A Small / Medium / Large switch sets how big the views are: Small fits up to 6 per row, Large shows one big view
+  per row. The choice is remembered in that browser.
 - FPP commands: `Yard Security - Arm`, `- Disarm`, `- Automatic`, `- Test Area` (usable in the Scheduler and playlists).
 - Optional built-in MQTT broker (FPP's preinstalled Mosquitto, password protected) turned on from the page.
 - A first-install walkthrough with live checks, replayable from a button.

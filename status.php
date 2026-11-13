@@ -76,7 +76,14 @@
 
     <!-- Sensors -->
     <div class="card mb-3">
-        <div class="card-header"><h2 class="h5 mb-0">Sensors (live)</h2></div>
+        <div class="card-header d-flex flex-wrap align-items-center gap-2">
+            <h2 class="h5 mb-0 me-auto">Sensors (live)</h2>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Sensor view size" id="ys-sensor-size">
+                <button type="button" class="btn btn-outline-secondary" data-size="small" aria-pressed="false">Small</button>
+                <button type="button" class="btn btn-outline-secondary" data-size="medium" aria-pressed="true">Medium</button>
+                <button type="button" class="btn btn-outline-secondary" data-size="large" aria-pressed="false">Large</button>
+            </div>
+        </div>
         <div class="card-body">
             <p class="small text-body-secondary mb-2">
                 Each sensor is drawn from above, pointing up the screen; "left" is your left when you stand behind the sensor looking out.

@@ -27,6 +27,19 @@
     var dirty = false;
     var revealedMqttPassword = null;  // the saved password, while Show displays it
 
+    // Sensors (live) size switch: Bootstrap columns per size. Remembered per
+    // browser; the page works the same if the browser will not store it.
+    var SENSOR_SIZES = {
+        small: 'col-6 col-md-4 col-lg-3 col-xxl-2',  // 2 on a phone, up to 6 per row
+        medium: 'col-12 col-md-6 col-xl-4',          // 1, 2 or 3 per row
+        large: 'col-12'                              // one big view per row
+    };
+    var sensorSize = 'medium';
+    try {
+        var savedSize = window.localStorage.getItem('yardsecurity.sensorSize');
+        if (SENSOR_SIZES[savedSize]) { sensorSize = savedSize; }
+    } catch (e) { /* storage blocked: keep the default */ }
+
     function $(id) { return document.getElementById(id); }
 
     function esc(s) {
@@ -458,7 +471,7 @@
                 var side = Math.abs(t.xFt) < 0.5 ? 'straight ahead' : Math.abs(t.xFt).toFixed(1) + ' ft ' + (t.xFt < 0 ? 'left' : 'right');
                 return t.distFt.toFixed(1) + ' ft away, ' + side;
             });
-            return '<div class="col-12 col-md-6 col-xl-4"><div class="border rounded p-2 h-100">' +
+            return '<div class="' + SENSOR_SIZES[sensorSize] + '"><div class="border rounded p-2 h-100">' +
                 '<div class="d-flex justify-content-between align-items-center mb-1"><b>' + esc(n) + '</b>' + state + '</div>' +
                 sensorSvg(n, s, areas, idx) +
                 '<div class="small">' + (targets.length ? targets.map(esc).join('<br>') : '<span class="text-body-secondary">Nobody seen</span>') + '</div>' +
@@ -632,6 +645,24 @@
                 toast('Could not load the password', false);
             });
         });
+
+        function showSensorSize() {
+            $('ys-sensors').setAttribute('data-size', sensorSize);
+            document.querySelectorAll('#ys-sensor-size [data-size]').forEach(function (b) {
+                var on = b.getAttribute('data-size') === sensorSize;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+        document.querySelectorAll('#ys-sensor-size [data-size]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                sensorSize = b.getAttribute('data-size');
+                try { window.localStorage.setItem('yardsecurity.sensorSize', sensorSize); } catch (e) { /* not kept */ }
+                showSensorSize();
+                if (lastStatus && lastStatus.ok !== false) { renderSensors(lastStatus); }
+            });
+        });
+        showSensorSize();
 
         $('ys-sim-open').addEventListener('click', function () {
             $('ys-sim-form').classList.toggle('d-none');
