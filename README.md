@@ -161,6 +161,22 @@ required), checks the broker accepts that user and password, and prints the `mqt
 printed with `--show-password`. If the page is set to "A broker I already run", it stops; `--builtin` switches it
 to the built-in broker. Safe to run again at any time, for example after an FPP OS upgrade.
 
+### Turning it on automatically whenever FPP starts
+
+FPP runs any Command Preset named **FPPD_STARTED** each time fppd starts. To have the broker turned on then (for
+example after an FPP OS upgrade removed it), all in FPP's web pages:
+
+1. Download [`tools/YardSecurity-BrokerOn.sh`](tools/YardSecurity-BrokerOn.sh) and upload it in
+   **Content Setup → File Manager → Scripts**.
+2. **Content Setup → Command Presets**: add a preset named **FPPD_STARTED** with the command **Run Script**,
+   Script Name `YardSecurity-BrokerOn.sh`, no arguments. Save.
+
+The uploaded file only starts the plugin's own `tools/broker-on.sh --boot`, so plugin updates keep it current.
+At start-up that turns the broker on only if it is off, a sensor password is saved on the Yard Security page, the
+page uses the built-in broker, and you have not turned the broker off on the page (**Turn off** is respected
+until you press **Turn on** again). It never makes, changes or prints a password and never restarts a running
+broker; what it did is in the plugin log.
+
 ## Updates, OS upgrades and backups
 
 | | Settings | Passwords | Built-in broker |

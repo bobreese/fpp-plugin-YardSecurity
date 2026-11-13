@@ -12,6 +12,11 @@
 #   4. Prints what goes in the ESPHome secrets.yaml.
 #
 # Options:
+#   --boot            for FPP start-up (YardSecurity-BrokerOn.sh in an
+#                     FPPD_STARTED Command Preset): silent (writes to
+#                     the plugin log), never makes or prints a password, does
+#                     nothing if the broker is already on or you turned it off
+#                     on the page, and never restarts a running broker
 #   --show-password   also print a password that was already saved (a new one
 #                     is always printed, since you need it for ESPHome)
 #   --builtin         if the page is set to "A broker I already run", switch
@@ -20,11 +25,13 @@
 set -u
 SHOW_PASSWORD=0
 FORCE_BUILTIN=0
+BOOT=0
 for arg in "$@"; do
     case "${arg}" in
+        --boot) BOOT=1 ;;
         --show-password) SHOW_PASSWORD=1 ;;
         --builtin) FORCE_BUILTIN=1 ;;
-        -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown option: ${arg} (try --help)"; exit 2 ;;
     esac
 done
@@ -33,6 +40,7 @@ done
 if [ "$(id -u)" != "0" ]; then
     exec sudo "$0" "$@"
 fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 : "${FPPDIR:=/opt/fpp}"
 if [ ! -f "${FPPDIR}/scripts/common" ]; then
@@ -41,8 +49,39 @@ if [ ! -f "${FPPDIR}/scripts/common" ]; then
 fi
 . "${FPPDIR}/scripts/common"
 export MEDIADIR LOGDIR
-PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Works from the plugin's tools/ folder or from a copy anywhere else, such as
+# FPP's scripts folder: the plugin itself is always in the plugins folder.
+if [ -f "${SCRIPT_DIR}/../lib/ys_common.py" ]; then
+    PLUGIN_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+    PLUGIN_DIR="${MEDIADIR}/plugins/fpp-plugin-YardSecurity"
+fi
+if [ ! -f "${PLUGIN_DIR}/lib/ys_common.py" ] || [ ! -x "${PLUGIN_DIR}/scripts/broker.sh" ]; then
+    echo "The Yard Security plugin is not installed (looked in ${PLUGIN_DIR})."
+    exit 1
+fi
 DATA_DIR="${MEDIADIR}/plugindata/fpp-plugin-YardSecurity"
+PLUGIN_LOG="${LOGDIR}/plugin-fpp-plugin-YardSecurity.log"
+
+# In --boot mode every message goes to the plugin log, not the screen.
+if [ "${BOOT}" = "1" ]; then
+    exec >> "${PLUGIN_LOG}" 2>&1
+fi
+say() {
+    if [ "${BOOT}" = "1" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') INFO broker-on: $*"
+    else
+        echo "$*"
+    fi
+}
+if [ "${BOOT}" = "1" ]; then
+    if [ -f "${DATA_DIR}/broker-off" ]; then
+        exit 0  # turned off on the page: leave it off
+    fi
+    if [ -f /etc/mosquitto/conf.d/fpp-plugin-YardSecurity.conf ] && systemctl is-active --quiet mosquitto 2>/dev/null; then
+        exit 0  # already on: nothing to do
+    fi
+fi
 OWNER="${FPPUSER:-fpp}:${FPPGROUP:-fpp}"
 
 mkdir -p "${DATA_DIR}"
@@ -50,11 +89,12 @@ chown "${OWNER}" "${DATA_DIR}" 2>/dev/null
 
 # Step 1: settings and password. Reads and writes the same files as the page,
 # with the same ownership and modes (settings 0644, passwords 0600).
-STEP1="$(/usr/bin/python3 -I - "${PLUGIN_DIR}/lib" "${FORCE_BUILTIN}" <<'PY'
+STEP1="$(/usr/bin/python3 -I - "${PLUGIN_DIR}/lib" "${FORCE_BUILTIN}" "${BOOT}" <<'PY'
 import json, os, secrets, string, sys
 sys.path.insert(0, sys.argv[1])
 import ys_common as C
 force_builtin = sys.argv[2] == "1"
+boot = sys.argv[3] == "1"
 
 raw = {}
 for path in (C.CONFIG_FILE, C.LEGACY_CONFIG_FILE):
@@ -70,7 +110,7 @@ mqtt = raw.setdefault("mqtt", {}) if isinstance(raw, dict) else {}
 out = {"configChanged": False, "generated": False}
 
 if cfg["mqtt"]["mode"] == "external":
-    if not force_builtin:
+    if not force_builtin or boot:
         print(json.dumps({"error": "external"}))
         sys.exit(0)
     mqtt["mode"] = "builtin"
@@ -85,6 +125,10 @@ if out["configChanged"]:
     out["configFile"] = C.CONFIG_FILE
 
 sec = C.load_secrets()
+if not sec.get("mqttPassword") and boot:
+    # At start-up nobody would see a new password: leave that to the page.
+    print(json.dumps({"error": "nopassword"}))
+    sys.exit(0)
 if not sec.get("mqttPassword"):
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
     sec["mqttPassword"] = "".join(secrets.choice(alphabet) for _ in range(20))
@@ -103,11 +147,20 @@ if [ -z "${STEP1}" ]; then
 fi
 field() { /usr/bin/python3 -I -c 'import json,sys; v=json.loads(sys.argv[1]).get(sys.argv[2], ""); print(str(v).lower() if isinstance(v, bool) else v)' "${STEP1}" "$1"; }
 
-if [ "$(field error)" = "external" ]; then
-    echo "The Yard Security page is set to use \"A broker I already run\", so the built-in broker is not used."
-    echo "Run this again with --builtin to switch to the built-in broker and turn it on."
-    exit 1
-fi
+case "$(field error)" in
+    external)
+        if [ "${BOOT}" = "1" ]; then
+            exit 0  # the page uses another broker: nothing to start
+        fi
+        echo "The Yard Security page is set to use \"A broker I already run\", so the built-in broker is not used."
+        echo "Run this again with --builtin to switch to the built-in broker and turn it on."
+        exit 1
+        ;;
+    nopassword)
+        say "not turning on the built-in broker: no MQTT password is saved yet (set one on the Yard Security page)"
+        exit 0
+        ;;
+esac
 USERNAME="$(field username)"
 PASSWORD="$(field password)"
 PREFIX="$(field prefix)"
@@ -124,10 +177,13 @@ fi
 RESULT="$("${PLUGIN_DIR}/scripts/broker.sh" enable)"
 OK="$(/usr/bin/python3 -I -c 'import json,sys; d=json.loads(sys.argv[1]); print("yes" if d.get("ok") else d.get("message", "failed"))' "${RESULT}" 2>/dev/null)"
 if [ "${OK}" != "yes" ]; then
-    echo "Could not turn on the broker: ${OK:-${RESULT}}"
+    say "Could not turn on the broker: ${OK:-${RESULT}}"
     exit 1
 fi
-echo "Built-in broker is on: port 1883, password required."
+say "Built-in broker is on: port 1883, password required."
+if [ "${BOOT}" = "1" ]; then
+    exit 0  # the plugin connects to it by itself within a few seconds
+fi
 
 # Step 3: log in with the saved user and password, as an ESP32 would.
 # The password goes in the environment, never on a command line (where any

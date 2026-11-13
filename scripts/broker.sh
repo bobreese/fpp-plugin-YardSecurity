@@ -21,6 +21,9 @@ MARKER="${DATA_DIR}/broker-was-enabled"
 # turn the broker back on afterwards. (Never turned back on automatically: a
 # plugin may only open a network port when you ask it to.)
 WANTED="${DATA_DIR}/broker-wanted"
+# Present after you turned the broker off on the page, so a start-up hook
+# (tools/broker-on.sh --boot) leaves it off.
+TURNED_OFF="${DATA_DIR}/broker-off"
 PLUGIN_LOG="${LOGDIR}/plugin-fpp-plugin-YardSecurity.log"
 export MEDIADIR LOGDIR
 
@@ -63,6 +66,7 @@ EOF
         if systemctl is-active --quiet mosquitto; then
             touch "${WANTED}"
             chown "${FPPUSER:-fpp}:${FPPGROUP:-fpp}" "${WANTED}" 2>/dev/null
+            rm -f "${TURNED_OFF}"
             logit "built-in broker enabled on port 1883"
             say true "Built-in broker is on (port 1883, password required)."
         else
@@ -79,6 +83,10 @@ EOF
             systemctl disable --now mosquitto > /dev/null 2>&1 || true
         fi
         rm -f "${MARKER}" "${WANTED}"
+        if [ -d "${DATA_DIR}" ]; then
+            touch "${TURNED_OFF}"
+            chown "${FPPUSER:-fpp}:${FPPGROUP:-fpp}" "${TURNED_OFF}" 2>/dev/null
+        fi
         logit "built-in broker disabled"
         say true "Built-in broker is off."
         ;;
