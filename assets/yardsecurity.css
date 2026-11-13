@@ -13,3 +13,13 @@
 .ys-app .ys-target { fill: var(--bs-danger); stroke: var(--bs-body-bg); stroke-width: 0.15; }
 .ys-app .ys-sensor-dot { fill: var(--bs-body-color); }
 .ys-app .ys-savebar { position: sticky; bottom: 0; background: var(--bs-body-bg); padding: 0.5rem 0; z-index: 2; }
+
+/* Walkthrough panel: docked, never covers the whole page. */
+.ys-tour { position: fixed; z-index: 1050; right: 1rem; bottom: 1rem; width: 26rem; max-width: calc(100vw - 2rem); max-height: 70vh; overflow-y: auto; }
+.ys-tour .ys-tour-pre { white-space: pre-wrap; word-break: break-all; background: var(--bs-tertiary-bg); }
+.ys-tour-target { outline: 3px solid var(--bs-primary); outline-offset: 4px; border-radius: var(--bs-border-radius); scroll-margin: 1rem; }
+@media (max-width: 767.98px) {
+    .ys-tour { left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: 50vh; border-radius: var(--bs-border-radius) var(--bs-border-radius) 0 0; }
+    body.ys-tour-open { padding-bottom: var(--ys-tour-h, 0px); }
+    body.ys-tour-open .ys-app .ys-savebar { bottom: var(--ys-tour-h, 0px); }
+}

@@ -15,8 +15,8 @@ python3 "$HERE/tests/mock_fpp.py" "$FPPPORT" "$WORK/commands.log" > /dev/null 2>
 sleep 1
 
 export MEDIADIR="$WORK/media" LOGDIR="$WORK/media/logs"
-mkdir -p "$MEDIADIR/plugindata/fpp-plugin-YardSecurity"
-cat > "$MEDIADIR/plugindata/fpp-plugin-YardSecurity/config.json" <<EOF
+mkdir -p "$MEDIADIR/plugindata/fpp-plugin-YardSecurity" "$MEDIADIR/config"
+cat > "$MEDIADIR/config/plugin.fpp-plugin-YardSecurity.json" <<EOF
 {
   "enabled": true, "logLevel": "debug",
   "show": {"host": "127.0.0.1:$FPPPORT"},

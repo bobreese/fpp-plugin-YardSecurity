@@ -18,5 +18,6 @@ fi
 # Keep areas and passwords across a Reinstall (FPP 10.4+), delete them otherwise.
 if [ "${FPP_PLUGIN_REINSTALL:-0}" != "1" ]; then
     rm -rf "${MEDIADIR}/plugindata/fpp-plugin-YardSecurity"
+    rm -f "${MEDIADIR}/config/plugin.fpp-plugin-YardSecurity.json"
 fi
 exit 0

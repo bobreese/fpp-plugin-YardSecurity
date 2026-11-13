@@ -1,4 +1,4 @@
-/* Yard Security plugin page. FPP loads every file in js/ on this plugin's pages. */
+/* Yard Security plugin page. Loaded by status.php with a version in the URL. */
 (function () {
     'use strict';
 
@@ -20,6 +20,9 @@
     };
 
     var cfg = null;
+    var presetInfo = { loaded: false, ok: false, count: 0, error: '' };
+    var brokerInfo = { loaded: false, configured: false, active: false, wanted: false };
+    var configInfo = { hasMqttPassword: false, hasShowPassword: false, walkthroughDone: true };
     var lastStatus = null;
     var dirty = false;
 
@@ -291,6 +294,9 @@
                 m.onExit = a && a.onExit && typeof a.onExit === 'object' ? a.onExit : { type: 'none' };
                 return m;
             });
+            configInfo.hasMqttPassword = !!r.hasMqttPassword;
+            configInfo.hasShowPassword = !!r.hasShowPassword;
+            configInfo.walkthroughDone = !!r.walkthroughDone;
             $('ys-show-password').placeholder = r.hasShowPassword ? '(saved)' : '';
             $('ys-mqtt-password').placeholder = r.hasMqttPassword ? '(saved)' : 'not set';
             if (render !== false) {
@@ -307,6 +313,7 @@
         api('presets' + q).then(function (r) {
             var list = $('ys-preset-list');
             list.innerHTML = '';
+            presetInfo = { loaded: true, ok: !!r.ok, count: r.ok ? r.presets.length : 0, error: r.ok ? '' : r.error };
             if (!r.ok) {
                 $('ys-presets-note').className = 'small mb-2 text-warning-emphasis';
                 $('ys-presets-note').textContent = r.error + ' You can still type preset names.';
@@ -320,15 +327,29 @@
             $('ys-presets-note').className = 'small mb-2 text-body-secondary';
             $('ys-presets-note').textContent = r.presets.length ? r.presets.length + ' presets found on the show player.' : 'The show player has no Command Presets yet.';
         }).catch(function () {
+            presetInfo = { loaded: true, ok: false, count: 0, error: 'Could not load presets.' };
             $('ys-presets-note').textContent = 'Could not load presets.';
         });
     }
 
     function refreshBroker() {
         api('broker').then(function (r) {
-            var s = !r.ok ? 'unknown' : (r.configured ? (r.active ? 'on' : 'configured, but Mosquitto is not running') : 'off');
+            brokerInfo = { loaded: true, configured: !!r.configured, active: !!r.active, wanted: !!r.wanted };
+            var s = !r.ok ? 'unknown' : (r.configured ? (r.active ? 'on' : 'configured, but Mosquitto is not running') :
+                (r.wanted ? 'off (removed by an FPP OS upgrade?)' : 'off'));
             $('ys-broker-state').textContent = s;
+            showBrokerLost();
         }).catch(function () { $('ys-broker-state').textContent = 'unknown'; });
+    }
+
+    // An FPP OS upgrade replaces /etc, which removes the built-in broker's
+    // settings. The plugin remembers it was on; offer to turn it back on.
+    function brokerLost() {
+        return !!(cfg && cfg.mqtt.mode === 'builtin' && brokerInfo.loaded && brokerInfo.wanted && !brokerInfo.configured);
+    }
+
+    function showBrokerLost() {
+        $('ys-broker-lost').classList.toggle('d-none', !brokerLost());
     }
 
     // ------------------------------------------------------------------ status
@@ -372,6 +393,34 @@
         return parts.join('');
     }
 
+    // Why the live view is empty (or stale), most basic reason first.
+    function sensorsNote(st, haveCards) {
+        var mq = st.mqtt || {};
+        var warn = function (html) {
+            return '<div class="col-12"><div class="alert alert-warning mb-0">' + html + '</div></div>';
+        };
+        if (!st.enabled) {
+            return warn('<b>Yard Security is switched off, so it is not listening to the sensors.</b> ' +
+                'Turn on <b>Yard Security is on</b> under Settings and press <b>Save settings</b>.');
+        }
+        if (mq.pahoMissing) {
+            return warn('<b>The MQTT library (python3-paho-mqtt) is missing.</b> Reinstall the plugin from the Plugin Manager.');
+        }
+        if (!mq.connected) {
+            var why = mq.error ? ' (' + esc(mq.error) + ')' : '';
+            var hint = cfg && cfg.mqtt.mode === 'builtin' && brokerInfo.loaded && !brokerInfo.configured ?
+                ' The built-in broker is off: press <b>Turn on</b> under Settings.' :
+                ' Check the broker settings, and that the MQTT password is saved.';
+            return warn('<b>Not connected to the sensor broker' + why + '.</b>' + hint);
+        }
+        if (!haveCards) {
+            var prefix = cfg ? esc(cfg.mqtt.topicPrefix) : 'yardsecurity';
+            return '<div class="col-12 text-body-secondary">Connected to the broker, but no sensors have reported yet. ' +
+                'Check that the ESP32s are powered and use the same MQTT user, password and topic prefix (<code>' + prefix + '</code>).</div>';
+        }
+        return '';
+    }
+
     function renderSensors(st) {
         var names = Object.keys(st.sensors || {});
         var areaSensors = {};
@@ -381,11 +430,12 @@
         var dl = $('ys-sensor-list');
         var opts = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
         if (dl.innerHTML !== opts) { dl.innerHTML = opts; }
+        var note = sensorsNote(st, names.length > 0);
         if (!names.length) {
-            $('ys-sensors').innerHTML = '<div class="col-12 text-body-secondary">No sensors have reported yet. Check the broker settings and that the ESP32s are powered.</div>';
+            $('ys-sensors').innerHTML = note;
             return;
         }
-        $('ys-sensors').innerHTML = names.map(function (n, idx) {
+        $('ys-sensors').innerHTML = note + names.map(function (n, idx) {
             var s = (st.sensors || {})[n] || { online: false, targets: [], ageSec: null };
             var state;
             if (s.ageSec === null || s.ageSec === undefined) { state = '<span class="badge text-bg-secondary">never heard from</span>'; }
@@ -438,8 +488,12 @@
         }).join('') : '<tr><td class="text-body-secondary">Nothing yet.</td></tr>';
     }
 
+    var pollCount = 0;
+
     function poll() {
         if (document.hidden) { return; }
+        pollCount++;
+        if (pollCount % 30 === 0) { refreshBroker(); }
         api('status').then(renderStatus).catch(function () { /* keep the last view */ });
     }
 
@@ -525,6 +579,17 @@
             this.textContent = f.type === 'password' ? 'Show' : 'Hide';
         });
 
+        $('ys-broker-restore').addEventListener('click', function () {
+            var btn = this;
+            btn.disabled = true;
+            api('broker/enable', 'POST', {}).then(function (r) {
+                toast(r.message, !!r.ok);
+                btn.disabled = false;
+                refreshBroker();
+                poll();
+            }).catch(function () { btn.disabled = false; toast('Could not turn the broker on', false); });
+        });
+
         $('ys-broker-on').addEventListener('click', function () {
             if (dirty) { toast('Save the settings first', false); return; }
             api('broker/enable', 'POST', {}).then(function (r) { toast(r.message, !!r.ok); refreshBroker(); poll(); });
@@ -538,11 +603,29 @@
             if (dirty) { e.preventDefault(); e.returnValue = ''; }
         });
 
+        // State the walkthrough (assets/yardsecurity-tour.js) reads for its live checks.
+        window.YardSecurity = {
+            status: function () { return lastStatus; },
+            config: function () { return cfg; },
+            presets: function () { return presetInfo; },
+            broker: function () { return brokerInfo; },
+            info: function () { return configInfo; },
+            isDirty: function () { return dirty; },
+            reloadPresets: loadPresets,
+            refreshBroker: refreshBroker,
+            markWalkthrough: function (done) {
+                configInfo.walkthroughDone = !!done;
+                return api('walkthrough', 'POST', { done: !!done });
+            }
+        };
+
         loadConfig().then(function () {
             loadPresets();
             refreshBroker();
             poll();
             window.setInterval(poll, 1000);
+            window.YardSecurity.ready = true;
+            document.dispatchEvent(new CustomEvent('ys:ready'));
         });
     }
 

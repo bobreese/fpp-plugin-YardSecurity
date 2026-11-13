@@ -5,10 +5,22 @@
         The Yard Security service is not running. It starts with fppd: restart FPP (or reinstall the plugin) and reload this page.
     </div>
 
+    <div id="ys-broker-lost" class="alert alert-warning d-none" role="alert">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="me-auto">
+                <b>The built-in MQTT broker is off, so the sensors cannot report.</b>
+                You had turned it on; an FPP OS upgrade removes its settings from the system. Your areas and the
+                sensor password are still saved.
+            </div>
+            <button type="button" class="btn btn-warning" id="ys-broker-restore">Turn it back on</button>
+        </div>
+    </div>
+
     <!-- Status -->
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
             <h2 class="h5 mb-0 me-auto">Yard Security</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="ys-tour-start">Walkthrough</button>
             <span id="ys-armed-badge" class="badge text-bg-secondary fs-6">...</span>
         </div>
         <div class="card-body">
@@ -183,3 +195,16 @@
         </div>
     </div>
 </div>
+<?php
+// Loaded here rather than from js/ and css/ (which FPP auto-loads with no
+// version in the URL): the ?v= changes with each update, so a browser can
+// never keep running an old copy of the page script against a new page.
+foreach (array('yardsecurity.css') as $f) {
+    printf("<link rel='stylesheet' href='plugin.php?plugin=fpp-plugin-YardSecurity&amp;file=assets/%s&amp;nopage=1&amp;v=%d'>\n",
+        $f, @filemtime(__DIR__ . '/assets/' . $f));
+}
+foreach (array('yardsecurity.js', 'yardsecurity-tour.js') as $f) {
+    printf("<script src='plugin.php?plugin=fpp-plugin-YardSecurity&amp;file=assets/%s&amp;nopage=1&amp;v=%d'></script>\n",
+        $f, @filemtime(__DIR__ . '/assets/' . $f));
+}
+?>
